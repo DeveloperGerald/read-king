@@ -1,0 +1,45 @@
+[project]
+name = "read-king"
+version = "0.1.0"
+description = "LLM-powered reading report generator (FastAPI + LangGraph + RAG), defaulting to local Ollama."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.27",
+  "python-multipart>=0.0.9",
+  "pydantic>=2.6",
+  "pydantic-settings>=2.2",
+  "httpx>=0.27",
+  "orjson>=3.10",
+]
+
+[dependency-groups]
+ai = [
+  "langchain>=1.2.17",
+  "langgraph>=1.1.10",
+  "langchain-community>=0.4.1",
+  "langchain-text-splitters>=1.1.2",
+]
+
+vectorstore = [
+  "chromadb-client>=1.1.0",
+]
+
+ingest = [
+  "jieba>=0.42",
+  "pypdf>=4.2",
+]
+
+embeddings = [
+  "langchain-community>=0.2",
+]
+
+embeddings-hf = [
+  "langchain-huggingface>=0.0.3; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+  "sentence-transformers>=2.6; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+]
+
+external-search = [
+  "langchain-tavily>=0.2.18",
+]
