@@ -29,6 +29,19 @@ export type ReportStatusResponse = {
   outline_path: string | null
 }
 
+export type BookMetaItem = {
+  book_id: string
+  title: string | null
+  author: string | null
+  original_filename: string | null
+  created_at: string | null
+}
+
+export type BookListResponse = {
+  items: BookMetaItem[]
+  total: number
+}
+
 async function parseJson<T>(res: Response): Promise<T> {
   const text = await res.text()
   if (!text) {
@@ -49,15 +62,29 @@ async function parseError(res: Response): Promise<string> {
   return `${res.status} ${res.statusText}`
 }
 
-export async function uploadBook(file: File): Promise<UploadBookResponse> {
+export async function uploadBook(file: File, title?: string, author?: string): Promise<UploadBookResponse> {
   const fd = new FormData()
   fd.append('file', file)
+  if (title) fd.append('title', title)
+  if (author) fd.append('author', author)
   const res = await fetch('/api/upload', {
     method: 'POST',
     body: fd,
   })
   if (!res.ok) throw new Error(await parseError(res))
   return parseJson<UploadBookResponse>(res)
+}
+
+export async function getBooks(): Promise<BookListResponse> {
+  const res = await fetch('/api/books')
+  if (!res.ok) throw new Error(await parseError(res))
+  return parseJson<BookListResponse>(res)
+}
+
+export async function getBookMeta(bookId: string): Promise<BookMetaItem> {
+  const res = await fetch(`/api/books/${encodeURIComponent(bookId)}/meta`)
+  if (!res.ok) throw new Error(await parseError(res))
+  return parseJson<BookMetaItem>(res)
 }
 
 export async function startIndex(bookId: string): Promise<IndexStatusResponse> {

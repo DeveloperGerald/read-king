@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { Tabs } from '@/components/ui/Tabs'
 import { MarkdownView } from '@/components/MarkdownView'
-import { getOutlineMarkdown, getReportMarkdown, getReportStatus, regenerateReport } from '@/utils/api'
+import { getOutlineMarkdown, getReportMarkdown, getReportStatus, getBookMeta, regenerateReport } from '@/utils/api'
 import { downloadTextFile } from '@/utils/download'
 import { loadDraft } from '@/utils/storage'
 import { useInterval } from '@/hooks/useInterval'
@@ -35,6 +35,7 @@ export default function Report() {
     report_path?: string | null
     outline_path?: string | null
   } | null>(null)
+  const [bookMeta, setBookMeta] = useState<{ title?: string | null; author?: string | null; original_filename?: string | null } | null>(null)
   const [loadingStatus, setLoadingStatus] = useState(false)
   const [tab, setTab] = useState<'outline' | 'render' | 'raw'>('render')
   const [outline, setOutline] = useState<string | null>(null)
@@ -86,9 +87,18 @@ export default function Report() {
 
   useEffect(() => {
     refresh()
-  }, [refresh])
+    if (bookId) {
+      getBookMeta(bookId)
+        .then(setBookMeta)
+        .catch((e) => console.error('failed to fetch book meta:', e))
+    }
+  }, [bookId, refresh])
 
-  useInterval(() => refresh(), processing ? 1500 : null)
+  const isTerminal = status?.status === 'completed' || status?.status === 'failed'
+
+  useInterval(() => {
+    if (bookId) refresh()
+  }, bookId && !isTerminal ? 1500 : null)
 
   const onRegenerate = useCallback(async () => {
     if (!bookId) return
@@ -118,9 +128,26 @@ export default function Report() {
         <div className="flex items-start justify-between gap-6">
           <div>
             <div className="text-sm text-zinc-400">报告</div>
-            <div className="mt-1 font-mono text-sm text-zinc-200">{bookId}</div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-lg font-semibold text-zinc-100">
+                {bookMeta?.title || bookMeta?.original_filename || bookId}
+              </span>
+              {bookMeta?.author ? <span className="text-sm text-zinc-400">by {bookMeta.author}</span> : null}
+              {bookMeta?.title && bookMeta?.original_filename ? (
+                <span className="text-xs text-zinc-500">({bookMeta.original_filename})</span>
+              ) : null}
+            </div>
+            <div className="mt-1 font-mono text-xs text-zinc-500">{bookId}</div>
             <div className="mt-2 flex items-center gap-2">
-              <Badge className={statusColor(status?.status || 'unknown')}>{status?.status || 'unknown'}</Badge>
+              <Badge className={statusColor(status?.status || 'unknown')}>
+                {status?.status === 'generating' ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Spinner className="h-3 w-3" /> 报告生成中...
+                  </span>
+                ) : (
+                  status?.status || 'unknown'
+                )}
+              </Badge>
               {status?.error ? <Badge className="border-red-900 bg-red-950/30 text-red-200">{status.error}</Badge> : null}
             </div>
           </div>
@@ -134,11 +161,6 @@ export default function Report() {
             <Button variant="secondary" onClick={onRegenerate} disabled={!bookId || regenerating || processing}>
               <span className="inline-flex items-center gap-2">
                 {regenerating ? <Spinner /> : <RefreshCw className="h-4 w-4" />} 重新生成
-              </span>
-            </Button>
-            <Button variant="secondary" onClick={refresh} disabled={!bookId || loadingStatus}>
-              <span className="inline-flex items-center gap-2">
-                {loadingStatus ? <Spinner /> : <RefreshCw className="h-4 w-4" />} 刷新
               </span>
             </Button>
           </div>

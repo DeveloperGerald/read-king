@@ -9,6 +9,7 @@ import { Tabs } from '@/components/ui/Tabs'
 import {
   type GenerateReportRequest,
   getIndexStatus,
+  getBookMeta,
   previewContext,
   previewPrompt,
   generateOutline,
@@ -38,6 +39,7 @@ export default function Book() {
   const draft = useMemo(() => state.draft ?? loadDraft(), [state.draft])
 
   const [indexStatus, setIndexStatus] = useState<{ status: string; updated_at?: string; error?: string | null } | null>(null)
+  const [bookMeta, setBookMeta] = useState<{ title?: string | null; author?: string | null; original_filename?: string | null } | null>(null)
   const [loadingIndex, setLoadingIndex] = useState(false)
   const [tab, setTab] = useState<'context' | 'prompt' | 'outline'>('context')
   const [context, setContext] = useState<string | null>(null)
@@ -116,7 +118,12 @@ export default function Book() {
         user_requirements: draft.user_requirements || '',
         user_feelings: draft.user_feelings || '',
       })
-      addReport({ book_id: bookId, created_at: Date.now() })
+      addReport({
+        book_id: bookId,
+        filename: bookMeta?.original_filename || '',
+        title: bookMeta?.title || undefined,
+        created_at: Date.now(),
+      })
       nav(`/reports/${bookId}`, { state: { draft } })
     } catch (e) {
       setPreviewErr(e instanceof Error ? e.message : String(e))
@@ -134,7 +141,12 @@ export default function Book() {
         user_requirements: draft.user_requirements || '',
         user_feelings: draft.user_feelings || '',
       })
-      addReport({ book_id: bookId, created_at: Date.now() })
+      addReport({
+        book_id: bookId,
+        filename: bookMeta?.original_filename || '',
+        title: bookMeta?.title || undefined,
+        created_at: Date.now(),
+      })
       nav(`/reports/${bookId}`, { state: { draft } })
     } catch (e) {
       setPreviewErr(e instanceof Error ? e.message : String(e))
@@ -145,13 +157,20 @@ export default function Book() {
 
   useEffect(() => {
     ensureIndexStarted()
-  }, [ensureIndexStarted])
+    if (bookId) {
+      getBookMeta(bookId)
+        .then(setBookMeta)
+        .catch((e) => console.error('failed to fetch book meta:', e))
+    }
+  }, [bookId, ensureIndexStarted])
+
+  const isIndexTerminal = indexStatus?.status === 'completed' || indexStatus?.status === 'failed'
 
   useInterval(
     () => {
-      if (indexStatus?.status === 'indexing') refreshIndex()
+      if (bookId) refreshIndex()
     },
-    indexStatus?.status === 'indexing' ? 1200 : null
+    bookId && !isIndexTerminal ? 1200 : null
   )
 
   useEffect(() => {
@@ -168,20 +187,32 @@ export default function Book() {
         <div className="flex items-start justify-between gap-6">
           <div>
             <div className="text-sm text-zinc-400">书籍处理</div>
-            <div className="mt-1 font-mono text-sm text-zinc-200">{bookId}</div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-lg font-semibold text-zinc-100">
+                {bookMeta?.title || bookMeta?.original_filename || bookId}
+              </span>
+              {bookMeta?.author ? <span className="text-sm text-zinc-400">by {bookMeta.author}</span> : null}
+              {bookMeta?.title && bookMeta?.original_filename ? (
+                <span className="text-xs text-zinc-500">({bookMeta.original_filename})</span>
+              ) : null}
+            </div>
+            <div className="mt-1 font-mono text-xs text-zinc-500">{bookId}</div>
             <div className="mt-2 flex items-center gap-2">
-              <Badge className={statusColor(indexStatus?.status || 'unknown')}>{indexStatus?.status || 'unknown'}</Badge>
+              <Badge className={statusColor(indexStatus?.status || 'unknown')}>
+                {indexStatus?.status === 'indexing' ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Spinner className="h-3 w-3" /> 索引中...
+                  </span>
+                ) : (
+                  indexStatus?.status || 'unknown'
+                )}
+              </Badge>
               {indexStatus?.error ? <Badge className="border-red-900 bg-red-950/30 text-red-200">{indexStatus.error}</Badge> : null}
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={() => nav('/')}>
               返回工作台
-            </Button>
-            <Button variant="secondary" onClick={refreshIndex} disabled={!bookId}>
-              <span className="inline-flex items-center gap-2">
-                <RefreshCw className="h-4 w-4" /> 刷新
-              </span>
             </Button>
           </div>
         </div>
@@ -190,8 +221,21 @@ export default function Book() {
           <Card className="lg:col-span-1">
             <CardTitle>索引</CardTitle>
             <CardDesc>上传后自动触发。未完成前预览不可用。</CardDesc>
-            <div className="mt-4 flex items-center gap-3">
-              <Button onClick={ensureIndexStarted} disabled={!bookId || loadingIndex}>
+            <div className="mt-4 flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <Badge className={statusColor(indexStatus?.status || 'unknown')}>
+                  {indexStatus?.status === 'indexing' ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Spinner className="h-3 w-3" /> 构建索引中
+                    </span>
+                  ) : (
+                    indexStatus?.status || 'unknown'
+                  )}
+                </Badge>
+                {indexStatus?.error ? <Badge className="border-red-900 bg-red-950/30 text-red-200">{indexStatus.error}</Badge> : null}
+              </div>
+
+              <Button onClick={ensureIndexStarted} disabled={!bookId || loadingIndex} size="sm" variant="secondary">
                 {loadingIndex ? (
                   <span className="inline-flex items-center gap-2">
                     <Spinner /> 启动中
@@ -202,7 +246,6 @@ export default function Book() {
                   </span>
                 )}
               </Button>
-              {indexStatus?.status === 'indexing' ? <Badge className="border-blue-900 bg-blue-950/30 text-blue-200">构建中</Badge> : null}
             </div>
           </Card>
 

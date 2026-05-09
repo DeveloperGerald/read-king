@@ -58,3 +58,16 @@ class ReportStatusResponse(BaseModel):
     error: str | None = None
     report_path: str | None = None
     outline_path: str | None = None
+
+
+class BookMetaItem(BaseModel):
+    book_id: str
+    title: str | None = None
+    author: str | None = None
+    original_filename: str | None = None
+    created_at: str | None = None
+
+
+class BookListResponse(BaseModel):
+    items: list[BookMetaItem]
+    total: int

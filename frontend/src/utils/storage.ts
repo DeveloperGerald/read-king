@@ -6,11 +6,15 @@ export type SavedDraft = {
 export type SavedBook = {
   book_id: string
   filename: string
+  title?: string
+  author?: string
   created_at: number
 }
 
 export type SavedReport = {
   book_id: string
+  filename: string
+  title?: string
   created_at: number
 }
 

@@ -21,7 +21,10 @@ from app.schemas.book import ChunkPreviewResponse
 from app.schemas.book import IndexStatusResponse
 from app.schemas.book import GenerateReportRequest
 from app.schemas.book import ReportStatusResponse
+from app.schemas.book import BookListResponse
+from app.schemas.book import BookMetaItem
 from app.services.book_meta_service import save_book_meta
+from app.services.book_meta_service import list_books
 from app.services.file_service import find_uploaded_file
 from app.services.file_service import save_upload_file
 from app.services.index_service import build_book_index
@@ -45,14 +48,18 @@ def upload_book(
     author: str | None = Form(default=None),
     settings: Settings = Depends(get_settings),
 ) -> UploadBookResponse:
-    _ = title
-    _ = author
     try:
         book_id, stored_filename, stored_path = save_upload_file(settings, file)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
-    save_book_meta(settings, book_id=book_id, title=title, author=author)
+    save_book_meta(
+        settings,
+        book_id=book_id,
+        title=title,
+        author=author,
+        original_filename=file.filename,
+    )
 
     stored_path_str = str(stored_path)
     return UploadBookResponse(
@@ -62,6 +69,25 @@ def upload_book(
         stored_path=stored_path_str,
         content_type=file.content_type,
     )
+
+
+# 获取所有已上传书籍的元数据列表
+@router.get("/books", response_model=BookListResponse)
+def get_books(
+    settings: Settings = Depends(get_settings),
+) -> BookListResponse:
+    books = list_books(settings)
+    items = [
+        BookMetaItem(
+            book_id=b.book_id,
+            title=b.title,
+            author=b.author,
+            original_filename=b.original_filename,
+            created_at=b.created_at,
+        )
+        for b in books
+    ]
+    return BookListResponse(items=items, total=len(items))
 
 
 # 抽取并清洗已上传书籍的全文，返回统计信息与预览
