@@ -26,13 +26,17 @@ from app.schemas.book import BookMetaItem
 from app.services.book_meta_service import save_book_meta
 from app.services.book_meta_service import list_books
 from app.services.book_meta_service import get_book_meta
+from app.services.book_meta_service import delete_book_meta
 from app.services.file_service import find_uploaded_file
 from app.services.file_service import save_upload_file
+from app.services.file_service import delete_uploaded_file
 from app.services.index_service import build_book_index
 from app.services.index_service import get_index_status
+from app.services.index_service import delete_index
 from app.services.index_service import update_index_status, IndexStatus, now_iso
 from app.services.report_service import generate_report
 from app.services.report_service import get_report_status
+from app.services.report_service import delete_report
 from app.services.text_extraction import extract_text
 from app.rag.chunking import chunk_text
 from app.agents.workflow import build_prompt_preview
@@ -106,6 +110,19 @@ def get_book_metadata(
         original_filename=meta.original_filename,
         created_at=meta.created_at,
     )
+
+
+# 删除书籍及其关联的所有数据（原文件、索引、元数据、报告）
+@router.delete("/books/{book_id}")
+def delete_book(
+    book_id: str,
+    settings: Settings = Depends(get_settings),
+) -> dict[str, str]:
+    delete_uploaded_file(settings, book_id)
+    delete_index(settings, book_id)
+    delete_report(settings, book_id)
+    delete_book_meta(settings, book_id)
+    return {"status": "ok", "message": f"book {book_id} deleted"}
 
 
 # 抽取并清洗已上传书籍的全文，返回统计信息与预览
@@ -239,6 +256,16 @@ def start_report_generation(
     )
     status = get_report_status(settings, book_id)
     return ReportStatusResponse(**status.__dict__)
+
+
+# 删除指定书籍的报告文件与状态
+@router.delete("/books/{book_id}/report")
+def delete_book_report(
+    book_id: str,
+    settings: Settings = Depends(get_settings),
+) -> dict[str, str]:
+    delete_report(settings, book_id)
+    return {"status": "ok", "message": f"report for book {book_id} deleted"}
 
 
 @router.post("/books/{book_id}/report/regenerate", response_model=ReportStatusResponse)

@@ -241,3 +241,10 @@ def generate_report(
         )
         _write_report_status(settings, failed)
         return failed
+
+
+# 删除指定 book_id 的报告文件与状态
+def delete_report(settings: Settings, book_id: str) -> None:
+    _safe_unlink(_report_path(settings, book_id))
+    _safe_unlink(_outline_path(settings, book_id))
+    _safe_unlink(_status_path(settings, book_id))

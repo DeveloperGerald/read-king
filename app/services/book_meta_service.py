@@ -87,3 +87,10 @@ def list_books(settings: Settings) -> list[BookMeta]:
     # 按创建时间降序排列（如果有的话）
     return sorted(results, key=lambda x: x.created_at or "", reverse=True)
 
+
+# 删除书籍元数据
+def delete_book_meta(settings: Settings, book_id: str) -> None:
+    p = _meta_path(settings, book_id)
+    if p.exists():
+        p.unlink()
+

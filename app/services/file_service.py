@@ -52,3 +52,10 @@ def find_uploaded_file(settings: Settings, book_id: str) -> Path | None:
     if not candidates:
         return None
     return candidates[0]
+
+
+# 删除指定 book_id 的已上传文件
+def delete_uploaded_file(settings: Settings, book_id: str) -> None:
+    p = find_uploaded_file(settings, book_id)
+    if p and p.exists():
+        p.unlink()

@@ -136,3 +136,11 @@ def build_book_index(
         )
         update_index_status(settings, failed)
         return failed
+
+
+# 删除指定 book_id 的索引与状态
+def delete_index(settings: Settings, book_id: str) -> None:
+    clear_vector_store(settings, book_id=book_id)
+    p = _status_path(settings, book_id)
+    if p.exists():
+        p.unlink()

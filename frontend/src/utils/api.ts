@@ -168,3 +168,19 @@ export async function getOutlineMarkdown(bookId: string): Promise<string> {
   if (!res.ok) throw new Error(await parseError(res))
   return res.text()
 }
+
+export async function deleteBook(bookId: string): Promise<{ status: string; message: string }> {
+  const res = await fetch(`/api/books/${encodeURIComponent(bookId)}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return parseJson(res)
+}
+
+export async function deleteReport(bookId: string): Promise<{ status: string; message: string }> {
+  const res = await fetch(`/api/books/${encodeURIComponent(bookId)}/report`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return parseJson(res)
+}

@@ -60,6 +60,12 @@ export function addBook(b: SavedBook) {
   localStorage.setItem(KEY_BOOKS, JSON.stringify(next))
 }
 
+export function removeBook(bookId: string) {
+  const list = loadBooks()
+  const next = list.filter((x) => x.book_id !== bookId)
+  localStorage.setItem(KEY_BOOKS, JSON.stringify(next))
+}
+
 export function loadReports(): SavedReport[] {
   try {
     const raw = localStorage.getItem(KEY_REPORTS)
@@ -75,6 +81,12 @@ export function loadReports(): SavedReport[] {
 export function addReport(r: SavedReport) {
   const list = loadReports()
   const next = [r, ...list.filter((x) => x.book_id !== r.book_id)].slice(0, 30)
+  localStorage.setItem(KEY_REPORTS, JSON.stringify(next))
+}
+
+export function removeReport(bookId: string) {
+  const list = loadReports()
+  const next = list.filter((x) => x.book_id !== bookId)
   localStorage.setItem(KEY_REPORTS, JSON.stringify(next))
 }
 

@@ -1,14 +1,14 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { UploadCloud, BookOpen, FileText, RefreshCw, ChevronLeft, Sun, Moon } from 'lucide-react'
+import { UploadCloud, BookOpen, FileText, RefreshCw, ChevronLeft, Sun, Moon, Trash2, ChevronRight } from 'lucide-react'
 import { Card, CardDesc, CardTitle } from '@/components/ui/Card'
 import { Textarea } from '@/components/ui/Textarea'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { Spinner } from '@/components/ui/Spinner'
-import { uploadBook, getBooks, type UploadBookResponse, type BookMetaItem } from '@/utils/api'
-import { addBook, loadBooks, loadDraft, saveDraft, loadReports } from '@/utils/storage'
+import { uploadBook, getBooks, deleteBook, deleteReport, type UploadBookResponse, type BookMetaItem } from '@/utils/api'
+import { addBook, loadBooks, loadDraft, saveDraft, loadReports, removeBook, removeReport } from '@/utils/storage'
 import { useTheme } from '@/hooks/useTheme'
 
 export default function Home() {
@@ -23,9 +23,12 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null)
   const [remoteBooks, setRemoteBooks] = useState<BookMetaItem[]>([])
   const [syncing, setSyncing] = useState(false)
+  const [bookPage, setBookPage] = useState(1)
+  const [reportPage, setReportPage] = useState(1)
+  const pageSize = 5
 
-  const localBooks = useMemo(() => loadBooks(), [])
-  const reports = useMemo(() => loadReports(), [])
+  const [localBooks, setLocalBooks] = useState(() => loadBooks())
+  const [reports, setReports] = useState(() => loadReports())
 
   // 合并本地缓存与后端扫描到的书籍，去重并排序
   const books = useMemo(() => {
@@ -55,6 +58,32 @@ export default function Home() {
     })
   }, [localBooks, remoteBooks])
 
+  const paginatedBooks = useMemo(() => {
+    const start = (bookPage - 1) * pageSize
+    return books.slice(start, start + pageSize)
+  }, [books, bookPage])
+
+  const paginatedReports = useMemo(() => {
+    const start = (reportPage - 1) * pageSize
+    return reports.slice(start, start + pageSize)
+  }, [reports, reportPage])
+
+  const totalBookPages = Math.ceil(books.length / pageSize)
+  const totalReportPages = Math.ceil(reports.length / pageSize)
+
+  // 确保页码在有效范围内
+  useEffect(() => {
+    if (bookPage > totalBookPages && totalBookPages > 0) {
+      setBookPage(totalBookPages)
+    }
+  }, [books.length, totalBookPages, bookPage])
+
+  useEffect(() => {
+    if (reportPage > totalReportPages && totalReportPages > 0) {
+      setReportPage(totalReportPages)
+    }
+  }, [reports.length, totalReportPages, reportPage])
+
   async function fetchRemoteBooks() {
     setSyncing(true)
     try {
@@ -70,6 +99,33 @@ export default function Home() {
   useEffect(() => {
     fetchRemoteBooks()
   }, [])
+
+  async function onDeleteBook(e: React.MouseEvent, bookId: string) {
+    e.stopPropagation()
+    if (!confirm('确定要删除这本书及其所有数据（包括报告和索引）吗？')) return
+    try {
+      await deleteBook(bookId)
+      removeBook(bookId)
+      removeReport(bookId)
+      setLocalBooks(loadBooks())
+      setReports(loadReports())
+      await fetchRemoteBooks()
+    } catch (err) {
+      alert('删除失败: ' + (err instanceof Error ? err.message : String(err)))
+    }
+  }
+
+  async function onDeleteReport(e: React.MouseEvent, bookId: string) {
+    e.stopPropagation()
+    if (!confirm('确定要删除这份报告吗？')) return
+    try {
+      await deleteReport(bookId)
+      removeReport(bookId)
+      setReports(loadReports())
+    } catch (err) {
+      alert('删除失败: ' + (err instanceof Error ? err.message : String(err)))
+    }
+  }
 
   async function onUpload() {
     if (!file) return
@@ -229,7 +285,7 @@ export default function Home() {
             <CardTitle>
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-2">
-                  <BookOpen className="h-4 w-4" /> 最近书籍
+                  <BookOpen className="h-4 w-4" /> 书籍列表
                 </span>
                 <button
                   onClick={fetchRemoteBooks}
@@ -243,51 +299,121 @@ export default function Home() {
             </CardTitle>
             <div className="mt-3 space-y-2">
               {books.length === 0 ? <div className="text-sm text-muted-foreground">暂无</div> : null}
-              {books.map((b) => (
-                <button
+              {paginatedBooks.map((b) => (
+                <div
                   key={b.book_id}
                   onClick={() => nav(`/books/${b.book_id}`, { state: { draft } })}
-                  className="flex w-full items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-left hover:bg-accent hover:text-accent-foreground transition-colors"
+                  className="flex w-full items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-left hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer group"
                 >
-                  <div className="min-w-0">
-                    <div className="truncate text-sm text-foreground">{b.title || b.filename}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm text-foreground font-medium">{b.title || b.filename}</div>
                     <div className="flex items-center gap-2 truncate text-xs text-muted-foreground">
                       {b.title ? <span className="truncate">{b.filename}</span> : null}
                       {b.title ? <span>•</span> : null}
                       <span className="shrink-0 font-mono">{b.book_id.slice(0, 8)}</span>
                     </div>
                   </div>
-                  <Badge className="shrink-0">打开</Badge>
-                </button>
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    <Badge className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/20">打开</Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => onDeleteBook(e, b.book_id)}
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
               ))}
             </div>
+            {totalBookPages > 1 && (
+              <div className="mt-4 flex items-center justify-center gap-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={bookPage === 1}
+                  onClick={() => setBookPage((p) => Math.max(1, p - 1))}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {bookPage} / {totalBookPages}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={bookPage === totalBookPages}
+                  onClick={() => setBookPage((p) => Math.min(totalBookPages, p + 1))}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </Card>
           <Card>
             <CardTitle>
               <span className="inline-flex items-center gap-2">
-                <FileText className="h-4 w-4" /> 最近报告
+                <FileText className="h-4 w-4" /> 报告列表
               </span>
             </CardTitle>
             <div className="mt-3 space-y-2">
               {reports.length === 0 ? <div className="text-sm text-muted-foreground">暂无</div> : null}
-              {reports.map((r) => (
-                <button
+              {paginatedReports.map((r) => (
+                <div
                   key={r.book_id}
                   onClick={() => nav(`/reports/${r.book_id}`, { state: { draft } })}
-                  className="flex w-full items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-left hover:bg-accent hover:text-accent-foreground transition-colors"
+                  className="flex w-full items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-left hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer group"
                 >
-                  <div className="min-w-0">
-                    <div className="truncate text-sm text-foreground">{r.title || r.filename || `ID: ${r.book_id.slice(0, 8)}`}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm text-foreground font-medium">{r.title || r.filename || `ID: ${r.book_id.slice(0, 8)}`}</div>
                     <div className="flex items-center gap-2 truncate text-xs text-muted-foreground">
                       {r.title ? <span className="truncate">{r.filename}</span> : null}
                       {r.title ? <span>•</span> : null}
                       <span className="shrink-0">点击查看报告</span>
                     </div>
                   </div>
-                  <Badge className="shrink-0">打开</Badge>
-                </button>
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    <Badge className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/20">打开</Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => onDeleteReport(e, r.book_id)}
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
               ))}
             </div>
+            {totalReportPages > 1 && (
+              <div className="mt-4 flex items-center justify-center gap-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={reportPage === 1}
+                  onClick={() => setReportPage((p) => Math.max(1, p - 1))}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {reportPage} / {totalReportPages}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={reportPage === totalReportPages}
+                  onClick={() => setReportPage((p) => Math.min(totalReportPages, p + 1))}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </Card>
         </div>
       </div>
