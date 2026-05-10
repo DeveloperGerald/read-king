@@ -25,10 +25,12 @@ from app.schemas.book import BookListResponse
 from app.schemas.book import BookMetaItem
 from app.services.book_meta_service import save_book_meta
 from app.services.book_meta_service import list_books
+from app.services.book_meta_service import get_book_meta
 from app.services.file_service import find_uploaded_file
 from app.services.file_service import save_upload_file
 from app.services.index_service import build_book_index
 from app.services.index_service import get_index_status
+from app.services.index_service import update_index_status, IndexStatus, now_iso
 from app.services.report_service import generate_report
 from app.services.report_service import get_report_status
 from app.services.text_extraction import extract_text
@@ -90,83 +92,99 @@ def get_books(
     return BookListResponse(items=items, total=len(items))
 
 
-# 抽取并清洗已上传书籍的全文，返回统计信息与预览
-@router.get("/books/{book_id}/text", response_model=ExtractTextResponse)
-def get_book_text(
+# 获取特定书籍的元数据
+@router.get("/books/{book_id}/meta", response_model=BookMetaItem)
+def get_book_metadata(
     book_id: str,
-    preview_chars: int = 1500,
     settings: Settings = Depends(get_settings),
-) -> ExtractTextResponse:
-    path = find_uploaded_file(settings, book_id)
-    if path is None:
-        raise HTTPException(status_code=404, detail="book not found")
-
-    try:
-        extracted = extract_text(path)
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-
-    preview = extracted.text[: max(0, preview_chars)]
-    return ExtractTextResponse(
-        book_id=book_id,
-        file_type=extracted.file_type,
-        char_count=extracted.char_count,
-        line_count=extracted.line_count,
-        preview=preview,
+) -> BookMetaItem:
+    meta = get_book_meta(settings, book_id)
+    return BookMetaItem(
+        book_id=meta.book_id,
+        title=meta.title,
+        author=meta.author,
+        original_filename=meta.original_filename,
+        created_at=meta.created_at,
     )
+
+
+# 抽取并清洗已上传书籍的全文，返回统计信息与预览
+# @router.get("/books/{book_id}/text", response_model=ExtractTextResponse)
+# def get_book_text(
+#     book_id: str,
+#     preview_chars: int = 1500,
+#     settings: Settings = Depends(get_settings),
+# ) -> ExtractTextResponse:
+#     path = find_uploaded_file(settings, book_id)
+#     if path is None:
+#         raise HTTPException(status_code=404, detail="book not found")
+
+#     try:
+#         extracted = extract_text(path)
+#     except RuntimeError as e:
+#         raise HTTPException(status_code=500, detail=str(e)) from e
+#     except ValueError as e:
+#         raise HTTPException(status_code=400, detail=str(e)) from e
+
+#     preview = extracted.text[: max(0, preview_chars)]
+#     return ExtractTextResponse(
+#         book_id=book_id,
+#         file_type=extracted.file_type,
+#         char_count=extracted.char_count,
+#         line_count=extracted.line_count,
+#         preview=preview,
+#     )
 
 
 # 预览分块结果：返回总 chunk 数与前 N 个 chunk 的头尾片段
-@router.get("/books/{book_id}/chunks", response_model=ChunkPreviewResponse)
-def preview_book_chunks(
-    book_id: str,
-    max_chars: int = 1200,
-    overlap_chars: int = 120,
-    limit: int = 5,
-    head_chars: int = 140,
-    tail_chars: int = 140,
-    settings: Settings = Depends(get_settings),
-) -> ChunkPreviewResponse:
-    if limit < 1:
-        raise HTTPException(status_code=400, detail="limit must be >= 1")
-    if limit > 50:
-        raise HTTPException(status_code=400, detail="limit must be <= 50")
+# @router.get("/books/{book_id}/chunks", response_model=ChunkPreviewResponse)
+# def preview_book_chunks(
+#     book_id: str,
+#     max_chars: int = 1200,
+#     overlap_chars: int = 120,
+#     limit: int = 5,
+#     head_chars: int = 140,
+#     tail_chars: int = 140,
+#     settings: Settings = Depends(get_settings),
+# ) -> ChunkPreviewResponse:
+#     if limit < 1:
+#         raise HTTPException(status_code=400, detail="limit must be >= 1")
+#     if limit > 50:
+#         raise HTTPException(status_code=400, detail="limit must be <= 50")
 
-    path = find_uploaded_file(settings, book_id)
-    if path is None:
-        raise HTTPException(status_code=404, detail="book not found")
+#     path = find_uploaded_file(settings, book_id)
+#     if path is None:
+#         raise HTTPException(status_code=404, detail="book not found")
 
-    try:
-        extracted = extract_text(path)
-        chunks = chunk_text(extracted.text, max_chars=max_chars, overlap_chars=overlap_chars)
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+#     try:
+#         extracted = extract_text(path)
+#         chunks = chunk_text(extracted.text, max_chars=max_chars, overlap_chars=overlap_chars)
+#     except RuntimeError as e:
+#         raise HTTPException(status_code=500, detail=str(e)) from e
+#     except ValueError as e:
+#         raise HTTPException(status_code=400, detail=str(e)) from e
 
-    items: list[ChunkPreviewItem] = []
-    for c in chunks[:limit]:
-        t = c.text
-        items.append(
-            ChunkPreviewItem(
-                index=c.index,
-                chunk_id=c.chunk_id,
-                char_count=len(t),
-                head=t[: max(0, head_chars)],
-                tail=t[-max(0, tail_chars) :] if tail_chars > 0 else "",
-            )
-        )
+#     items: list[ChunkPreviewItem] = []
+#     for c in chunks[:limit]:
+#         t = c.text
+#         items.append(
+#             ChunkPreviewItem(
+#                 index=c.index,
+#                 chunk_id=c.chunk_id,
+#                 char_count=len(t),
+#                 head=t[: max(0, head_chars)],
+#                 tail=t[-max(0, tail_chars) :] if tail_chars > 0 else "",
+#             )
+#         )
 
-    return ChunkPreviewResponse(
-        book_id=book_id,
-        file_type=extracted.file_type,
-        total_chunks=len(chunks),
-        max_chars=max_chars,
-        overlap_chars=overlap_chars,
-        items=items,
-    )
+#     return ChunkPreviewResponse(
+#         book_id=book_id,
+#         file_type=extracted.file_type,
+#         total_chunks=len(chunks),
+#         max_chars=max_chars,
+#         overlap_chars=overlap_chars,
+#         items=items,
+#     )
 
 
 # 启动索引构建任务（抽取→分块→写入 Chroma），后台执行
@@ -178,6 +196,10 @@ def start_book_index(
     overlap_chars: int = 120,
     settings: Settings = Depends(get_settings),
 ) -> IndexStatusResponse:
+    # 立即同步更新状态为 indexing，防止旧状态干扰接口返回
+    status = IndexStatus(book_id=book_id, status="indexing", updated_at=now_iso())
+    update_index_status(settings, status)
+
     background_tasks.add_task(
         build_book_index,
         settings,
@@ -185,7 +207,6 @@ def start_book_index(
         max_chars=max_chars,
         overlap_chars=overlap_chars,
     )
-    status = get_index_status(settings, book_id)
     return IndexStatusResponse(**status.__dict__)
 
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Copy, Download, RefreshCw } from 'lucide-react'
+import { Copy, Download, RefreshCw, Sun, Moon } from 'lucide-react'
 import { Card, CardDesc, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -11,19 +11,21 @@ import { getOutlineMarkdown, getReportMarkdown, getReportStatus, getBookMeta, re
 import { downloadTextFile } from '@/utils/download'
 import { loadDraft } from '@/utils/storage'
 import { useInterval } from '@/hooks/useInterval'
+import { useTheme } from '@/hooks/useTheme'
 
 type RouteState = { draft?: { user_requirements: string; user_feelings: string } }
 
 function statusColor(status: string) {
-  if (status === 'completed') return 'border-emerald-800 bg-emerald-950/40 text-emerald-200'
-  if (status === 'failed') return 'border-red-900 bg-red-950/30 text-red-200'
-  if (status === 'generating') return 'border-blue-900 bg-blue-950/30 text-blue-200'
-  return 'border-zinc-800 bg-zinc-900 text-zinc-200'
+  if (status === 'completed') return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+  if (status === 'failed') return 'border-destructive/20 bg-destructive/10 text-destructive'
+  if (status === 'generating') return 'border-primary/20 bg-primary/10 text-primary'
+  return 'border-border bg-muted text-muted-foreground'
 }
 
 export default function Report() {
   const { bookId } = useParams()
   const nav = useNavigate()
+  const { isDark, toggleTheme } = useTheme()
   const location = useLocation()
   const state = (location.state || {}) as RouteState
   const _draft = useMemo(() => state.draft ?? loadDraft(), [state.draft])
@@ -51,7 +53,6 @@ export default function Report() {
     try {
       const st = await getReportStatus(bookId)
       setStatus(st)
-      const jobs: PromiseSettledResult<string>[] = []
       const tasks: Array<Promise<string>> = []
       const kinds: Array<'outline' | 'report'> = []
 
@@ -123,21 +124,21 @@ export default function Report() {
   }, [bookId, _draft.user_feelings, _draft.user_requirements, refresh])
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       <div className="mx-auto max-w-6xl px-6 py-10">
         <div className="flex items-start justify-between gap-6">
           <div>
-            <div className="text-sm text-zinc-400">报告</div>
+            <div className="text-sm text-muted-foreground">报告</div>
             <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-lg font-semibold text-zinc-100">
+              <span className="text-lg font-semibold text-foreground">
                 {bookMeta?.title || bookMeta?.original_filename || bookId}
               </span>
-              {bookMeta?.author ? <span className="text-sm text-zinc-400">by {bookMeta.author}</span> : null}
+              {bookMeta?.author ? <span className="text-sm text-muted-foreground">by {bookMeta.author}</span> : null}
               {bookMeta?.title && bookMeta?.original_filename ? (
-                <span className="text-xs text-zinc-500">({bookMeta.original_filename})</span>
+                <span className="text-xs text-muted-foreground/60">({bookMeta.original_filename})</span>
               ) : null}
             </div>
-            <div className="mt-1 font-mono text-xs text-zinc-500">{bookId}</div>
+            <div className="mt-1 font-mono text-xs text-muted-foreground/50">{bookId}</div>
             <div className="mt-2 flex items-center gap-2">
               <Badge className={statusColor(status?.status || 'unknown')}>
                 {status?.status === 'generating' ? (
@@ -148,10 +149,19 @@ export default function Report() {
                   status?.status || 'unknown'
                 )}
               </Badge>
-              {status?.error ? <Badge className="border-red-900 bg-red-950/30 text-red-200">{status.error}</Badge> : null}
+              {status?.error ? <Badge className="border-destructive/20 bg-destructive/10 text-destructive">{status.error}</Badge> : null}
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleTheme}
+              className="h-9 w-9 p-0"
+              title={isDark ? '切换到浅色模式' : '切换到深色模式'}
+            >
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
             <Button variant="ghost" onClick={() => nav('/')}>返回工作台</Button>
             {bookId ? (
               <Button variant="secondary" onClick={() => nav(`/books/${bookId}`, { state: { draft: _draft } })}>
@@ -170,8 +180,8 @@ export default function Report() {
           <Card className="lg:col-span-1">
             <CardTitle>大纲</CardTitle>
             <CardDesc>即使正文生成失败，也会展示已落盘的 outline。</CardDesc>
-            <div className="mt-4 h-[620px] overflow-auto rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-              {outline ? <pre className="whitespace-pre-wrap break-words text-xs leading-5 text-zinc-200">{outline}</pre> : <div className="text-sm text-zinc-500">暂无</div>}
+            <div className="mt-4 h-[620px] overflow-auto rounded-lg border border-border bg-background p-4 shadow-inner">
+              {outline ? <pre className="whitespace-pre-wrap break-words text-xs leading-5 text-foreground/80">{outline}</pre> : <div className="text-sm text-muted-foreground">暂无</div>}
             </div>
           </Card>
 
@@ -218,15 +228,15 @@ export default function Report() {
                 value={tab}
                 onChange={(v) => setTab(v as typeof tab)}
               />
-              {processing ? <Badge className="border-blue-900 bg-blue-950/30 text-blue-200">生成中…</Badge> : null}
+              {processing ? <Badge className="border-primary/20 bg-primary/10 text-primary">生成中…</Badge> : null}
             </div>
 
-            {err ? <div className="mt-4 rounded-md border border-red-900/50 bg-red-950/30 p-3 text-sm text-red-200">{err}</div> : null}
-            <div className="mt-4 h-[620px] overflow-auto rounded-lg border border-zinc-800 bg-zinc-950 p-5">
-              {!markdown && processing ? <div className="text-sm text-zinc-500">等待生成完成…</div> : null}
-              {!markdown && !processing ? <div className="text-sm text-zinc-500">暂无内容</div> : null}
+            {err ? <div className="mt-4 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">{err}</div> : null}
+            <div className="mt-4 h-[620px] overflow-auto rounded-lg border border-border bg-background p-5 shadow-inner">
+              {!markdown && processing ? <div className="text-sm text-muted-foreground">等待生成完成…</div> : null}
+              {!markdown && !processing ? <div className="text-sm text-muted-foreground">暂无内容</div> : null}
               {markdown && tab === 'raw' ? (
-                <pre className="whitespace-pre-wrap break-words text-xs leading-5 text-zinc-200">{markdown}</pre>
+                <pre className="whitespace-pre-wrap break-words text-xs leading-5 text-foreground/80">{markdown}</pre>
               ) : null}
               {markdown && tab === 'render' ? <MarkdownView markdown={markdown} /> : null}
             </div>

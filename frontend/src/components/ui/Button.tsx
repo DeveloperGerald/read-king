@@ -13,10 +13,10 @@ export function Button({ className, variant = 'primary', size = 'md', ...props }
     md: 'h-10 px-4 text-sm',
   } as const
   const variants = {
-    primary: 'bg-blue-500 text-white hover:bg-blue-600',
-    secondary: 'bg-zinc-800 text-zinc-100 hover:bg-zinc-700',
-    ghost: 'bg-transparent text-zinc-100 hover:bg-zinc-800',
-    danger: 'bg-red-500 text-white hover:bg-red-600',
+    primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
+    secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+    ghost: 'bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground',
+    danger: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
   } as const
   return <button className={cn(base, sizes[size], variants[variant], className)} {...props} />
 }

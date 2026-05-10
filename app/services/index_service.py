@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from app.core.config import Settings
-from app.rag.vector_store import get_vector_store
+from app.rag.vector_store import get_vector_store, clear_vector_store
 from app.rag.chunking import chunk_text
 from app.rag.structure import extract_toc
 from app.services.file_service import ensure_storage_dirs
@@ -24,7 +24,7 @@ class IndexStatus:
     error: str | None = None
 
 
-def _now_iso() -> str:
+def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
@@ -37,20 +37,21 @@ def get_index_status(settings: Settings, book_id: str) -> IndexStatus:
     ensure_storage_dirs(settings)
     p = _status_path(settings, book_id)
     if not p.exists():
-        return IndexStatus(book_id=book_id, status="uploaded", updated_at=_now_iso())
+        return IndexStatus(book_id=book_id, status="uploaded", updated_at=now_iso())
 
     data = json.loads(p.read_text("utf-8"))
     return IndexStatus(
         book_id=data.get("book_id", book_id),
         status=data.get("status", "unknown"),
-        updated_at=data.get("updated_at", _now_iso()),
+        updated_at=data.get("updated_at", now_iso()),
         total_chars=data.get("total_chars"),
         total_chunks=data.get("total_chunks"),
         error=data.get("error"),
     )
 
 
-def _write_index_status(settings: Settings, status: IndexStatus) -> None:
+# 更新索引状态并持久化
+def update_index_status(settings: Settings, status: IndexStatus) -> None:
     ensure_storage_dirs(settings)
     p = _status_path(settings, status.book_id)
     payload = {
@@ -75,14 +76,17 @@ def build_book_index(
     ensure_storage_dirs(settings)
     source_path = find_uploaded_file(settings, book_id)
     if source_path is None:
-        status = IndexStatus(book_id=book_id, status="not_found", updated_at=_now_iso())
-        _write_index_status(settings, status)
+        status = IndexStatus(book_id=book_id, status="not_found", updated_at=now_iso())
+        update_index_status(settings, status)
         return status
 
-    running = IndexStatus(book_id=book_id, status="indexing", updated_at=_now_iso())
-    _write_index_status(settings, running)
+    running = IndexStatus(book_id=book_id, status="indexing", updated_at=now_iso())
+    update_index_status(settings, running)
 
     try:
+        # 强制重试时先清理旧索引，防止数据残留
+        clear_vector_store(settings, book_id=book_id)
+
         extracted = extract_text(source_path)
         toc = extract_toc(extracted.text)
         chunks = chunk_text(extracted.text, max_chars=max_chars, overlap_chars=overlap_chars)
@@ -117,18 +121,18 @@ def build_book_index(
         done = IndexStatus(
             book_id=book_id,
             status="completed",
-            updated_at=_now_iso(),
+            updated_at=now_iso(),
             total_chars=extracted.char_count,
             total_chunks=len(chunks),
         )
-        _write_index_status(settings, done)
+        update_index_status(settings, done)
         return done
     except Exception as e:  # noqa: BLE001
         failed = IndexStatus(
             book_id=book_id,
             status="failed",
-            updated_at=_now_iso(),
+            updated_at=now_iso(),
             error=str(e),
         )
-        _write_index_status(settings, failed)
+        update_index_status(settings, failed)
         return failed

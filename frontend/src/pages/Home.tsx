@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { UploadCloud, BookOpen, FileText, RefreshCw, ChevronLeft } from 'lucide-react'
+import { UploadCloud, BookOpen, FileText, RefreshCw, ChevronLeft, Sun, Moon } from 'lucide-react'
 import { Card, CardDesc, CardTitle } from '@/components/ui/Card'
 import { Textarea } from '@/components/ui/Textarea'
 import { Button } from '@/components/ui/Button'
@@ -9,9 +9,11 @@ import { Badge } from '@/components/ui/Badge'
 import { Spinner } from '@/components/ui/Spinner'
 import { uploadBook, getBooks, type UploadBookResponse, type BookMetaItem } from '@/utils/api'
 import { addBook, loadBooks, loadDraft, saveDraft, loadReports } from '@/utils/storage'
+import { useTheme } from '@/hooks/useTheme'
 
 export default function Home() {
   const nav = useNavigate()
+  const { isDark, toggleTheme } = useTheme()
   const [draft, setDraft] = useState(() => loadDraft())
   const [confirmed, setConfirmed] = useState(false)
   const [file, setFile] = useState<File | null>(null)
@@ -91,15 +93,24 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       <div className="mx-auto max-w-6xl px-6 py-10">
         <div className="flex items-start justify-between gap-6">
           <div>
             <div className="text-2xl font-semibold tracking-tight">ReadKing</div>
-            <div className="mt-1 text-sm text-zinc-400">先写需求，再上传，上传后自动建索引并支持预览与生成。</div>
+            <div className="mt-1 text-sm text-muted-foreground">先写需求，再上传，上传后自动建索引并支持预览与生成。</div>
           </div>
           <div className="flex items-center gap-2">
-            <Badge className="border-zinc-700 bg-zinc-900/60 text-zinc-200">Backend: /api</Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleTheme}
+              className="h-9 w-9 p-0"
+              title={isDark ? '切换到浅色模式' : '切换到深色模式'}
+            >
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            <Badge className="border-border bg-secondary text-secondary-foreground">Backend: /api</Badge>
           </div>
         </div>
 
@@ -111,7 +122,7 @@ export default function Home() {
               <div className="mt-4 space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <div className="mb-1 text-xs text-zinc-400">书名 (必填)</div>
+                    <div className="mb-1 text-xs text-muted-foreground">书名 (必填)</div>
                     <Input
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
@@ -119,7 +130,7 @@ export default function Home() {
                     />
                   </div>
                   <div>
-                    <div className="mb-1 text-xs text-zinc-400">作者 (可选)</div>
+                    <div className="mb-1 text-xs text-muted-foreground">作者 (可选)</div>
                     <Input
                       value={author}
                       onChange={(e) => setAuthor(e.target.value)}
@@ -128,7 +139,7 @@ export default function Home() {
                   </div>
                 </div>
                 <div>
-                  <div className="mb-1 text-xs text-zinc-400">生成需求</div>
+                  <div className="mb-1 text-xs text-muted-foreground">生成需求</div>
                   <Textarea
                     value={draft.user_requirements}
                     onChange={(e) => setDraft({ ...draft, user_requirements: e.target.value })}
@@ -136,7 +147,7 @@ export default function Home() {
                   />
                 </div>
                 <div>
-                  <div className="mb-1 text-xs text-zinc-400">读后感 / 个人理解</div>
+                  <div className="mb-1 text-xs text-muted-foreground">读后感 / 个人理解</div>
                   <Textarea
                     value={draft.user_feelings}
                     onChange={(e) => setDraft({ ...draft, user_feelings: e.target.value })}
@@ -155,9 +166,9 @@ export default function Home() {
                     保存并进入上传
                   </Button>
                   {!title.trim() ? (
-                    <span className="text-xs text-red-400/80">请先填写书名</span>
+                    <span className="text-xs text-destructive">请先填写书名</span>
                   ) : (
-                    <span className="text-xs text-zinc-500">保存后会缓存到本地浏览器</span>
+                    <span className="text-xs text-muted-foreground">保存后会缓存到本地浏览器</span>
                   )}
                 </div>
               </div>
@@ -168,7 +179,7 @@ export default function Home() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="-ml-2 h-8 text-zinc-400 hover:text-zinc-100"
+                  className="-ml-2 h-8 text-muted-foreground hover:text-foreground"
                   onClick={() => setConfirmed(false)}
                 >
                   <ChevronLeft className="mr-1 h-4 w-4" /> 返回修改需求
@@ -176,12 +187,12 @@ export default function Home() {
               </div>
               <CardTitle>2) 上传书籍文件</CardTitle>
               <CardDesc>
-                正在为 <span className="text-zinc-100 font-medium">“{title}”</span> 上传文件。
+                正在为 <span className="text-foreground font-medium">“{title}”</span> 上传文件。
                 支持 PDF/TXT。
               </CardDesc>
               <div className="mt-4 space-y-4">
                 <div>
-                  <div className="mb-1 text-xs text-zinc-400">选择文件</div>
+                  <div className="mb-1 text-xs text-muted-foreground">选择文件</div>
                   <Input
                     type="file"
                     aria-label="book file"
@@ -204,7 +215,7 @@ export default function Home() {
                   </Button>
                 </div>
                 {error ? (
-                  <div className="rounded-md border border-red-900/50 bg-red-950/30 p-3 text-sm text-red-200">
+                  <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
                     {error}
                   </div>
                 ) : null}
@@ -223,7 +234,7 @@ export default function Home() {
                 <button
                   onClick={fetchRemoteBooks}
                   disabled={syncing}
-                  className="rounded p-1 hover:bg-zinc-800 disabled:opacity-50"
+                  className="rounded p-1 hover:bg-muted disabled:opacity-50"
                   title="同步后端数据"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
@@ -231,16 +242,16 @@ export default function Home() {
               </div>
             </CardTitle>
             <div className="mt-3 space-y-2">
-              {books.length === 0 ? <div className="text-sm text-zinc-500">暂无</div> : null}
+              {books.length === 0 ? <div className="text-sm text-muted-foreground">暂无</div> : null}
               {books.map((b) => (
                 <button
                   key={b.book_id}
                   onClick={() => nav(`/books/${b.book_id}`, { state: { draft } })}
-                  className="flex w-full items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-left hover:bg-zinc-900"
+                  className="flex w-full items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-left hover:bg-accent hover:text-accent-foreground transition-colors"
                 >
                   <div className="min-w-0">
-                    <div className="truncate text-sm text-zinc-100">{b.title || b.filename}</div>
-                    <div className="flex items-center gap-2 truncate text-xs text-zinc-500">
+                    <div className="truncate text-sm text-foreground">{b.title || b.filename}</div>
+                    <div className="flex items-center gap-2 truncate text-xs text-muted-foreground">
                       {b.title ? <span className="truncate">{b.filename}</span> : null}
                       {b.title ? <span>•</span> : null}
                       <span className="shrink-0 font-mono">{b.book_id.slice(0, 8)}</span>
@@ -258,16 +269,16 @@ export default function Home() {
               </span>
             </CardTitle>
             <div className="mt-3 space-y-2">
-              {reports.length === 0 ? <div className="text-sm text-zinc-500">暂无</div> : null}
+              {reports.length === 0 ? <div className="text-sm text-muted-foreground">暂无</div> : null}
               {reports.map((r) => (
                 <button
                   key={r.book_id}
                   onClick={() => nav(`/reports/${r.book_id}`, { state: { draft } })}
-                  className="flex w-full items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-left hover:bg-zinc-900"
+                  className="flex w-full items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-left hover:bg-accent hover:text-accent-foreground transition-colors"
                 >
                   <div className="min-w-0">
-                    <div className="truncate text-sm text-zinc-100">{r.title || r.filename || `ID: ${r.book_id.slice(0, 8)}`}</div>
-                    <div className="flex items-center gap-2 truncate text-xs text-zinc-500">
+                    <div className="truncate text-sm text-foreground">{r.title || r.filename || `ID: ${r.book_id.slice(0, 8)}`}</div>
+                    <div className="flex items-center gap-2 truncate text-xs text-muted-foreground">
                       {r.title ? <span className="truncate">{r.filename}</span> : null}
                       {r.title ? <span>•</span> : null}
                       <span className="shrink-0">点击查看报告</span>

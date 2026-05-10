@@ -37,6 +37,19 @@ def get_collection_name(settings: Settings, *, book_id: str) -> str:
     return f"{prefix}_{book_id}"
 
 
+# 清理指定 book_id 的向量集合
+def clear_vector_store(settings: Settings, *, book_id: str) -> None:
+    _require_vectorstore()
+    client = get_chroma_http_client(settings)
+    collection_name = get_collection_name(settings, book_id=book_id)
+    try:
+        client.delete_collection(name=collection_name)
+        logger.info(f"Deleted Chroma collection: {collection_name}")
+    except Exception:
+        # 如果集合不存在，忽略错误
+        logger.warning(f"Collection {collection_name} not found, skip deletion.")
+
+
 # 获取 LangChain VectorStore（Chroma），用于 add_texts / similarity_search
 def get_vector_store(settings: Settings, *, book_id: str):
     _require_vectorstore()
