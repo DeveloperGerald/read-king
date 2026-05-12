@@ -25,11 +25,13 @@ class Settings(BaseSettings):
     embedding_provider: str = "ollama"
     embedding_model: str = "nomic-embed-text"
 
-    deepseek_api_base: str | None = None
+    deepseek_api_base: str | None = "https://api.deepseek.com"
     deepseek_api_key: str | None = Field(default=None, repr=False)
+    deepseek_model: str = "deepseek-chat"
 
-    siliconflow_api_base: str | None = None
+    siliconflow_api_base: str | None = "https://api.siliconflow.cn/v1"
     siliconflow_api_key: str | None = Field(default=None, repr=False)
+    siliconflow_model: str = "deepseek-ai/DeepSeek-V3"
 
     tavily_api_key: str | None = Field(default=None, repr=False)
     tavily_max_results: int = 5

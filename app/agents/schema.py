@@ -18,12 +18,12 @@ class ReportOutline(BaseModel):
 class ReviewResult(BaseModel):
     """审核结果。"""
     approved: bool = Field(description="是否通过审核。")
-    feedback: Optional[str] = Field(description="具体的修改建议，如果通过则可为空。")
+    feedback: Optional[str] = Field(default=None, description="具体的修改建议，如果通过则可为空。")
 
 class ResearchReflection(BaseModel):
     """研究反思结果。"""
     sufficient: bool = Field(description="当前搜集的素材是否足以支撑一份高质量报告。")
-    missing_info: Optional[str] = Field(description="缺失的关键信息或需要进一步研究的方向。")
+    missing_info: Optional[str] = Field(default=None, description="缺失的关键信息或需要进一步研究的方向。")
     next_action: str = Field(
         default="none", 
         description="下一步需要哪个研究员继续补充素材(book_expert, context_researcher, both, none)。"

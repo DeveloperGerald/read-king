@@ -116,10 +116,10 @@ def build_agentic_report_graph(settings: Settings):
         
         请评估素材是否充分。"""
         
-        structured_llm = model.with_structured_output(ResearchReflection)
+        structured_llm = model.with_structured_output(ResearchReflection, method="json_mode")
         try:
             reflection: ResearchReflection = structured_llm.invoke([
-                SystemMessage(content=RESEARCH_REFLECTOR_SYSTEM_PROMPT),
+                SystemMessage(content=RESEARCH_REFLECTOR_SYSTEM_PROMPT + "\n请严格输出 JSON 格式，包含字段：sufficient (bool), missing_info (str or null), next_action (str)。"),
                 HumanMessage(content=reflector_prompt)
             ])
             
@@ -171,10 +171,10 @@ def build_agentic_report_graph(settings: Settings):
         
         请输出一份结构清晰、逻辑严密的大纲。"""
         
-        structured_llm = model.with_structured_output(ReportOutline)
+        structured_llm = model.with_structured_output(ReportOutline, method="json_mode")
         try:
             outline: ReportOutline = structured_llm.invoke([
-                SystemMessage(content="你是一位擅长结构化表达的写作专家。"),
+                SystemMessage(content="你是一位擅长结构化表达的写作专家。请严格输出 JSON 格式，包含字段：title (str), sections (list of objects with heading and bullets)。"),
                 HumanMessage(content=planner_prompt)
             ])
             
@@ -260,10 +260,10 @@ def build_agentic_report_graph(settings: Settings):
         
         如果通过审核，请输出 approved=True。如果不通过，请输出 approved=False 并给出具体的修改建议。"""
         
-        structured_llm = model.with_structured_output(ReviewResult)
+        structured_llm = model.with_structured_output(ReviewResult, method="json_mode")
         try:
             review: ReviewResult = structured_llm.invoke([
-                SystemMessage(content="你是一位专业的资深编辑。"),
+                SystemMessage(content="你是一位专业的资深编辑。请严格输出 JSON 格式，包含字段：approved (bool), feedback (str or null)。"),
                 HumanMessage(content=reviewer_prompt)
             ])
             
