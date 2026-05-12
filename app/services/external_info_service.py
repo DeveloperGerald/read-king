@@ -57,7 +57,7 @@ def _tavily_search(*, api_key: str, query: str, max_results: int, topic: str) ->
         return None
 
 
-# 获取外部书籍信息（默认使用免费接口 Open Library + Wikipedia，并带本地缓存）
+# 获取外部书籍信息（默认使用tavily）
 def get_external_book_info(
     settings: Settings,
     *,

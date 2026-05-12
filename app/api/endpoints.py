@@ -35,7 +35,7 @@ from app.services.index_service import get_index_status
 from app.services.index_service import delete_index
 from app.services.index_service import update_index_status, IndexStatus, now_iso
 from app.services.report_service import generate_report
-from app.services.report_service import get_report_status
+from app.services.report_service import get_report_status, ReportStatus, update_report_status, now_iso as report_now_iso
 from app.services.report_service import delete_report
 from app.services.text_extraction import extract_text
 from app.rag.chunking import chunk_text
@@ -246,6 +246,35 @@ def start_report_generation(
     force: bool = Query(default=False),
     settings: Settings = Depends(get_settings),
 ) -> ReportStatusResponse:
+    """
+    启动或重新生成读书报告。
+    如果 force=True，则会同步清理已有结果并重新开始生成流程。
+    如果 force=False 且已有结果，则会报错提示用户。
+    """
+    # 1. 处理 force 逻辑
+    if force:
+        # 同步清理文件
+        delete_report(settings, book_id)
+        # 同步写入 generating 状态，确保接口立即返回正确状态
+        update_report_status(
+            settings,
+            ReportStatus(book_id=book_id, status="generating", updated_at=report_now_iso())
+        )
+    else:
+        # 检查是否已存在报告、大纲或状态文件
+        status = get_report_status(settings, book_id)
+        if status.status != "none":
+            raise HTTPException(
+                status_code=400,
+                detail="报告已存在或正在生成中。如果需要重新生成，请点击重新生成按钮。"
+            )
+        # 即使不是 force，如果是第一次生成，也同步写入 generating 状态
+        update_report_status(
+            settings,
+            ReportStatus(book_id=book_id, status="generating", updated_at=report_now_iso())
+        )
+
+    # 2. 启动后台任务
     background_tasks.add_task(
         generate_report,
         settings,
@@ -254,8 +283,9 @@ def start_report_generation(
         user_feelings=body.user_feelings,
         force=force,
     )
-    status = get_report_status(settings, book_id)
-    return ReportStatusResponse(**status.__dict__)
+    # 3. 返回当前状态（由于是异步，此处可能还是 none 或刚变为 generating）
+    current_status = get_report_status(settings, book_id)
+    return ReportStatusResponse(**current_status.__dict__)
 
 
 # 删除指定书籍的报告文件与状态
@@ -266,25 +296,6 @@ def delete_book_report(
 ) -> dict[str, str]:
     delete_report(settings, book_id)
     return {"status": "ok", "message": f"report for book {book_id} deleted"}
-
-
-@router.post("/books/{book_id}/report/regenerate", response_model=ReportStatusResponse)
-def regenerate_report(
-    book_id: str,
-    body: GenerateReportRequest,
-    background_tasks: BackgroundTasks,
-    settings: Settings = Depends(get_settings),
-) -> ReportStatusResponse:
-    background_tasks.add_task(
-        generate_report,
-        settings,
-        book_id=book_id,
-        user_requirements=body.user_requirements,
-        user_feelings=body.user_feelings,
-        force=True,
-    )
-    status = get_report_status(settings, book_id)
-    return ReportStatusResponse(**status.__dict__)
 
 
 # 查询读书报告生成状态
@@ -326,62 +337,62 @@ def read_report_outline_file(
 
 
 # 预览工作流抽取到的 context（不调用 LLM）
-@router.post("/books/{book_id}/workflow/context", response_class=PlainTextResponse)
-def preview_workflow_context(
-    book_id: str,
-    body: GenerateReportRequest,
-    settings: Settings = Depends(get_settings),
-) -> PlainTextResponse:
-    out = run_report_workflow(
-        settings=settings,
-        book_id=book_id,
-        user_requirements=body.user_requirements,
-        user_feelings=body.user_feelings,
-        mode="context",
-    )
-    if out.get("status") != "context_ready":
-        err = out.get("error") or "workflow context failed"
-        if err == "book not found":
-            raise HTTPException(status_code=404, detail=err)
-        raise HTTPException(status_code=500, detail=err)
-    return PlainTextResponse(out.get("context") or "")
+# @router.post("/books/{book_id}/workflow/context", response_class=PlainTextResponse)
+# def preview_workflow_context(
+#     book_id: str,
+#     body: GenerateReportRequest,
+#     settings: Settings = Depends(get_settings),
+# ) -> PlainTextResponse:
+#     out = run_report_workflow(
+#         settings=settings,
+#         book_id=book_id,
+#         user_requirements=body.user_requirements,
+#         user_feelings=body.user_feelings,
+#         mode="context",
+#     )
+#     if out.get("status") != "context_ready":
+#         err = out.get("error") or "workflow context failed"
+#         if err == "book not found":
+#             raise HTTPException(status_code=404, detail=err)
+#         raise HTTPException(status_code=500, detail=err)
+#     return PlainTextResponse(out.get("context") or "")
 
 
 # 预览最终 prompt（包含 external_info + context，不调用 LLM）
-@router.post("/books/{book_id}/workflow/prompt", response_class=PlainTextResponse)
-def preview_workflow_prompt(
-    book_id: str,
-    body: GenerateReportRequest,
-    settings: Settings = Depends(get_settings),
-) -> PlainTextResponse:
-    try:
-        preview = build_prompt_preview(
-            settings=settings,
-            book_id=book_id,
-            user_requirements=body.user_requirements,
-            user_feelings=body.user_feelings,
-        )
-    except RuntimeError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=str(e)) from e
-    return PlainTextResponse(preview.get("prompt", ""))
+# @router.post("/books/{book_id}/workflow/prompt", response_class=PlainTextResponse)
+# def preview_workflow_prompt(
+#     book_id: str,
+#     body: GenerateReportRequest,
+#     settings: Settings = Depends(get_settings),
+# ) -> PlainTextResponse:
+#     try:
+#         preview = build_prompt_preview(
+#             settings=settings,
+#             book_id=book_id,
+#             user_requirements=body.user_requirements,
+#             user_feelings=body.user_feelings,
+#         )
+#     except RuntimeError as e:
+#         raise HTTPException(status_code=404, detail=str(e)) from e
+#     except Exception as e:  # noqa: BLE001
+#         raise HTTPException(status_code=500, detail=str(e)) from e
+#     return PlainTextResponse(preview.get("prompt", ""))
 
 
 # 生成并返回大纲（调用 LLM，仅输出 outline，不扩写正文）
-@router.post("/books/{book_id}/workflow/outline", response_class=PlainTextResponse)
-def generate_outline_only(
-    book_id: str,
-    body: GenerateReportRequest,
-    settings: Settings = Depends(get_settings),
-) -> PlainTextResponse:
-    out = run_report_workflow(
-        settings=settings,
-        book_id=book_id,
-        user_requirements=body.user_requirements,
-        user_feelings=body.user_feelings,
-        mode="outline",
-    )
-    if out.get("status") != "outlined":
-        raise HTTPException(status_code=500, detail=out.get("error") or "workflow outline failed")
-    return PlainTextResponse(out.get("outline_markdown") or "")
+# @router.post("/books/{book_id}/workflow/outline", response_class=PlainTextResponse)
+# def generate_outline_only(
+#     book_id: str,
+#     body: GenerateReportRequest,
+#     settings: Settings = Depends(get_settings),
+# ) -> PlainTextResponse:
+#     out = run_report_workflow(
+#         settings=settings,
+#         book_id=book_id,
+#         user_requirements=body.user_requirements,
+#         user_feelings=body.user_feelings,
+#         mode="outline",
+#     )
+#     if out.get("status") != "outlined":
+#         raise HTTPException(status_code=500, detail=out.get("error") or "workflow outline failed")
+#     return PlainTextResponse(out.get("outline_markdown") or "")

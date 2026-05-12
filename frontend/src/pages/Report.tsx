@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { Tabs } from '@/components/ui/Tabs'
 import { MarkdownView } from '@/components/MarkdownView'
-import { getOutlineMarkdown, getReportMarkdown, getReportStatus, getBookMeta, regenerateReport } from '@/utils/api'
+import { getOutlineMarkdown, getReportMarkdown, getReportStatus, getBookMeta, startReport } from '@/utils/api'
 import { downloadTextFile } from '@/utils/download'
 import { loadDraft } from '@/utils/storage'
 import { useInterval } from '@/hooks/useInterval'
@@ -36,6 +36,9 @@ export default function Report() {
     error?: string | null
     report_path?: string | null
     outline_path?: string | null
+    current_step?: string | null
+    total_steps?: number
+    completed_steps?: number
   } | null>(null)
   const [bookMeta, setBookMeta] = useState<{ title?: string | null; author?: string | null; original_filename?: string | null } | null>(null)
   const [loadingStatus, setLoadingStatus] = useState(false)
@@ -110,10 +113,14 @@ export default function Report() {
     setMarkdown(null)
     setStatus({ status: 'generating' })
     try {
-      await regenerateReport(bookId, {
-        user_requirements: _draft.user_requirements || '',
-        user_feelings: _draft.user_feelings || '',
-      })
+      await startReport(
+        bookId,
+        {
+          user_requirements: _draft.user_requirements || '',
+          user_feelings: _draft.user_feelings || '',
+        },
+        true
+      )
       await refresh()
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
@@ -139,17 +146,33 @@ export default function Report() {
               ) : null}
             </div>
             <div className="mt-1 font-mono text-xs text-muted-foreground/50">{bookId}</div>
-            <div className="mt-2 flex items-center gap-2">
-              <Badge className={statusColor(status?.status || 'unknown')}>
-                {status?.status === 'generating' ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <Spinner className="h-3 w-3" /> 报告生成中...
-                  </span>
-                ) : (
-                  status?.status || 'unknown'
-                )}
-              </Badge>
-              {status?.error ? <Badge className="border-destructive/20 bg-destructive/10 text-destructive">{status.error}</Badge> : null}
+            <div className="mt-2 flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <Badge className={statusColor(status?.status || 'unknown')}>
+                  {status?.status === 'generating' ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Spinner className="h-3 w-3" /> {status.current_step || '报告生成中...'}
+                    </span>
+                  ) : (
+                    status?.status || 'unknown'
+                  )}
+                </Badge>
+                {status?.error ? <Badge className="border-destructive/20 bg-destructive/10 text-destructive">{status.error}</Badge> : null}
+              </div>
+              {status?.status === 'generating' && status.total_steps ? (
+                <div className="flex w-72 flex-col gap-1.5">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-primary/10">
+                    <div
+                      className="h-full bg-primary transition-all duration-500 ease-out"
+                      style={{ width: `${Math.min(100, Math.round(((status.completed_steps || 0) / status.total_steps) * 100))}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] font-medium text-muted-foreground/80">
+                    <span>生成进度: {Math.round(((status.completed_steps || 0) / status.total_steps) * 100)}%</span>
+                    <span>{status.completed_steps} / {status.total_steps} 阶段</span>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -181,7 +204,7 @@ export default function Report() {
             <CardTitle>大纲</CardTitle>
             <CardDesc>即使正文生成失败，也会展示已落盘的 outline。</CardDesc>
             <div className="mt-4 h-[620px] overflow-auto rounded-lg border border-border bg-background p-4 shadow-inner">
-              {outline ? <pre className="whitespace-pre-wrap break-words text-xs leading-5 text-foreground/80">{outline}</pre> : <div className="text-sm text-muted-foreground">暂无</div>}
+              {outline ? <MarkdownView markdown={outline} /> : <div className="text-sm text-muted-foreground">暂无</div>}
             </div>
           </Card>
 

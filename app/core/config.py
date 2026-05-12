@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Dict, List, Optional
 
 from pydantic import Field
 from pydantic import model_validator
@@ -17,12 +17,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=None, extra="ignore")
 
-    llm_provider: Literal["ollama", "deepseek", "siliconflow"] = "ollama"
+    llm_provider: str = "ollama"
 
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:7b"
 
-    embedding_provider: Literal["ollama", "huggingface"] = "ollama"
+    embedding_provider: str = "ollama"
     embedding_model: str = "nomic-embed-text"
 
     deepseek_api_base: str | None = None
@@ -33,7 +33,7 @@ class Settings(BaseSettings):
 
     tavily_api_key: str | None = Field(default=None, repr=False)
     tavily_max_results: int = 5
-    tavily_topic: Literal["general", "news", "finance"] = "general"
+    tavily_topic: str = "general"
 
     retrieval_max_snippets: int = 18
     retrieval_per_section_max: int = 2
@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     chroma_server_port: int = 8002
     chroma_collection_prefix: str = "readking"
 
-    log_level: Literal["debug", "info", "warning", "error"] = "info"
+    log_level: str = "info"
 
     # 校验配置在不同 Provider 下的必填项，避免运行到一半才报错
     @model_validator(mode="after")

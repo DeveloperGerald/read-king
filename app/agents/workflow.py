@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any
-from typing import Literal
-from typing import TypedDict
+from typing import Any, Dict, List, Optional, TypedDict
 
 from app.core.config import Settings
 from app.services.file_service import find_uploaded_file
@@ -659,6 +657,7 @@ def build_report_graph(*, settings: Settings):
                 "生成要求（阶段2：按大纲扩写正文）：",
                 "- 按下面大纲逐节扩写为完整读书报告（Markdown）。",
                 "- 不要引入未在片段/外部信息中出现的新事实。",
+                "- 直接输出 Markdown 正文内容，不要将输出包裹在 ```markdown 或 ``` 代码块中。",
                 "大纲（优先按结构执行）：",
                 outline_payload,
             ]
@@ -778,7 +777,7 @@ def run_report_workflow(
     book_id: str,
     user_requirements: str | None = None,
     user_feelings: str | None = None,
-    mode: Literal["report", "context", "outline"] = "report",
+    mode: str = "report",
 ) -> dict[str, Any]:
     if mode == "context":
         path = find_uploaded_file(settings, book_id)

@@ -101,6 +101,7 @@ export async function getIndexStatus(bookId: string): Promise<IndexStatusRespons
   return parseJson<IndexStatusResponse>(res)
 }
 
+/*
 export async function previewContext(bookId: string, body: GenerateReportRequest): Promise<string> {
   const res = await fetch(`/api/books/${encodeURIComponent(bookId)}/workflow/context`, {
     method: 'POST',
@@ -120,7 +121,9 @@ export async function previewPrompt(bookId: string, body: GenerateReportRequest)
   if (!res.ok) throw new Error(await parseError(res))
   return res.text()
 }
+*/
 
+/*
 export async function generateOutline(bookId: string, body: GenerateReportRequest): Promise<string> {
   const res = await fetch(`/api/books/${encodeURIComponent(bookId)}/workflow/outline`, {
     method: 'POST',
@@ -130,19 +133,11 @@ export async function generateOutline(bookId: string, body: GenerateReportReques
   if (!res.ok) throw new Error(await parseError(res))
   return res.text()
 }
+*/
 
-export async function startReport(bookId: string, body: GenerateReportRequest): Promise<ReportStatusResponse> {
-  const res = await fetch(`/api/books/${encodeURIComponent(bookId)}/report`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error(await parseError(res))
-  return parseJson<ReportStatusResponse>(res)
-}
-
-export async function regenerateReport(bookId: string, body: GenerateReportRequest): Promise<ReportStatusResponse> {
-  const res = await fetch(`/api/books/${encodeURIComponent(bookId)}/report/regenerate`, {
+export async function startReport(bookId: string, body: GenerateReportRequest, force: boolean = false): Promise<ReportStatusResponse> {
+  const url = `/api/books/${encodeURIComponent(bookId)}/report${force ? '?force=true' : ''}`
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

@@ -12,9 +12,12 @@ logger = logging.getLogger(__name__)
 def get_chat_model(settings: Settings):
     if settings.llm_provider == "ollama":
         try:
-            from langchain_community.chat_models import ChatOllama
-        except Exception as e:  # noqa: BLE001
-            raise RuntimeError("Missing LLM dependencies. Install with: uv sync --group ai") from e
+            from langchain_ollama import ChatOllama
+        except ImportError:
+            try:
+                from langchain_community.chat_models import ChatOllama
+            except Exception as e:  # noqa: BLE001
+                raise RuntimeError("Missing LLM dependencies. Install with: uv sync --group ai") from e
 
         logger.info(f"Using Ollama chat model: {settings.ollama_model}")
         return ChatOllama(

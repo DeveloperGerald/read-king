@@ -58,6 +58,9 @@ class ReportStatusResponse(BaseModel):
     error: str | None = None
     report_path: str | None = None
     outline_path: str | None = None
+    current_step: str | None = None
+    total_steps: int | None = None
+    completed_steps: int | None = None
 
 
 class BookMetaItem(BaseModel):

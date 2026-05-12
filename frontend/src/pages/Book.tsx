@@ -11,11 +11,7 @@ import {
   type GenerateReportRequest,
   getIndexStatus,
   getBookMeta,
-  previewContext,
-  previewPrompt,
-  generateOutline,
   startIndex,
-  regenerateReport,
   startReport,
 } from '@/utils/api'
 import { addReport, loadDraft } from '@/utils/storage'
@@ -43,10 +39,6 @@ export default function Book() {
   const [indexStatus, setIndexStatus] = useState<{ status: string; updated_at?: string; error?: string | null } | null>(null)
   const [bookMeta, setBookMeta] = useState<{ title?: string | null; author?: string | null; original_filename?: string | null } | null>(null)
   const [loadingIndex, setLoadingIndex] = useState(false)
-  const [tab, setTab] = useState<'context' | 'prompt' | 'outline'>('context')
-  const [context, setContext] = useState<string | null>(null)
-  const [prompt, setPrompt] = useState<string | null>(null)
-  const [outline, setOutline] = useState<string | null>(null)
   const [previewErr, setPreviewErr] = useState<string | null>(null)
   const [busyPreview, setBusyPreview] = useState(false)
   const [reporting, setReporting] = useState(false)
@@ -98,33 +90,6 @@ export default function Book() {
     }
   }, [bookId])
 
-  const loadTab = useCallback(async (which: typeof tab) => {
-    if (!bookId) return
-    if (!canFetchPreview) return
-    setPreviewErr(null)
-    setBusyPreview(true)
-    const body: GenerateReportRequest = {
-      user_requirements: draft.user_requirements || '',
-      user_feelings: draft.user_feelings || '',
-    }
-    try {
-      if (which === 'context') {
-        const t = await previewContext(bookId, body)
-        setContext(t)
-      } else if (which === 'prompt') {
-        const t = await previewPrompt(bookId, body)
-        setPrompt(t)
-      } else {
-        const t = await generateOutline(bookId, body)
-        setOutline(t)
-      }
-    } catch (e) {
-      setPreviewErr(e instanceof Error ? e.message : String(e))
-    } finally {
-      setBusyPreview(false)
-    }
-  }, [bookId, canFetchPreview, draft.user_feelings, draft.user_requirements])
-
   const onGenerateReport = useCallback(async () => {
     if (!bookId) return
     setReporting(true)
@@ -152,10 +117,14 @@ export default function Book() {
     if (!window.confirm('确定要重新生成报告吗？这会覆盖已有报告。')) return
     setReporting(true)
     try {
-      await regenerateReport(bookId, {
-        user_requirements: draft.user_requirements || '',
-        user_feelings: draft.user_feelings || '',
-      })
+      await startReport(
+        bookId,
+        {
+          user_requirements: draft.user_requirements || '',
+          user_feelings: draft.user_feelings || '',
+        },
+        true
+      )
       addReport({
         book_id: bookId,
         filename: bookMeta?.original_filename || '',
@@ -187,14 +156,6 @@ export default function Book() {
     },
     bookId && !isIndexTerminal ? 1200 : null
   )
-
-  useEffect(() => {
-    if (!canFetchPreview) return
-    if (tab === 'context' && context === null) loadTab('context')
-    if (tab === 'prompt' && prompt === null) loadTab('prompt')
-  }, [canFetchPreview, context, loadTab, prompt, tab])
-
-  const content = tab === 'context' ? context : tab === 'prompt' ? prompt : outline
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
@@ -241,10 +202,10 @@ export default function Book() {
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Card className="lg:col-span-1">
-            <CardTitle>索引</CardTitle>
-            <CardDesc>上传后自动触发。未完成前预览不可用。</CardDesc>
+            <CardTitle>索引状态</CardTitle>
+            <CardDesc>上传后自动触发。索引完成后即可生成报告。</CardDesc>
             <div className="mt-4 flex flex-col gap-3">
               <div className="flex items-center gap-2">
                 <Badge className={statusColor(indexStatus?.status || 'unknown')}>
@@ -273,15 +234,13 @@ export default function Book() {
             </div>
           </Card>
 
-          <Card className="lg:col-span-2">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <CardTitle>预览</CardTitle>
-                <CardDesc>context/prompt 不调用 LLM；outline 会调用 LLM。</CardDesc>
-              </div>
-              <div className="flex items-center gap-2">
+          <Card className="lg:col-span-1">
+            <CardTitle>报告操作</CardTitle>
+            <CardDesc>点击下方按钮开始生成 AI 读书报告。</CardDesc>
+            <div className="mt-6 flex flex-col gap-3">
+              <div className="flex flex-wrap gap-2">
                 <Button
-                  variant="secondary"
+                  className="flex-1"
                   disabled={!canFetchPreview || reporting}
                   onClick={onGenerateReport}
                 >
@@ -295,7 +254,7 @@ export default function Book() {
                     </span>
                   )}
                 </Button>
-                <Button variant="secondary" disabled={!canFetchPreview || reporting} onClick={onRegenerateReport}>
+                <Button variant="secondary" className="flex-1" disabled={!canFetchPreview || reporting} onClick={onRegenerateReport}>
                   {reporting ? (
                     <span className="inline-flex items-center gap-2">
                       <Spinner /> 生成中
@@ -306,47 +265,18 @@ export default function Book() {
                     </span>
                   )}
                 </Button>
-                <Button variant="ghost" disabled={!bookId} onClick={() => nav(`/reports/${bookId}`, { state: { draft } })}>
-                  <span className="inline-flex items-center gap-2">
-                    <FileText className="h-4 w-4" /> 查看报告
-                  </span>
-                </Button>
               </div>
-            </div>
-
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <Tabs
-                items={[
-                  { key: 'context', label: 'Context' },
-                  { key: 'prompt', label: 'Prompt' },
-                  { key: 'outline', label: 'Outline' },
-                ]}
-                value={tab}
-                onChange={(v) => setTab(v as typeof tab)}
-              />
-              <Button
-                variant="ghost"
-                disabled={!canFetchPreview || busyPreview}
-                onClick={() => loadTab(tab)}
-              >
-                {busyPreview ? (
-                  <span className="inline-flex items-center gap-2">
-                    <Spinner /> 加载中
-                  </span>
-                ) : (
-                  '重新加载'
-                )}
+              
+              <Button variant="ghost" className="w-full" disabled={!bookId} onClick={() => nav(`/reports/${bookId}`, { state: { draft } })}>
+                <span className="inline-flex items-center gap-2">
+                  <FileText className="h-4 w-4" /> 查看已有报告
+                </span>
               </Button>
-            </div>
 
-            {previewErr ? <div className="mt-4 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">{previewErr}</div> : null}
-            {!canFetchPreview ? (
-              <div className="mt-4 rounded-md border border-border bg-muted/50 p-3 text-sm text-muted-foreground">索引完成后才能预览。</div>
-            ) : null}
-            <div className="mt-4 h-[520px] overflow-auto rounded-lg border border-border bg-background p-4 shadow-inner">
-              {busyPreview && !content ? <div className="text-sm text-muted-foreground">加载中…</div> : null}
-              {!busyPreview && !content ? <div className="text-sm text-muted-foreground">暂无内容</div> : null}
-              {content ? <pre className="whitespace-pre-wrap break-words text-xs leading-5 text-foreground/80">{content}</pre> : null}
+              {previewErr ? <div className="mt-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">{previewErr}</div> : null}
+              {!canFetchPreview ? (
+                <div className="mt-2 text-xs text-muted-foreground">提示：索引完成后才能生成报告。</div>
+              ) : null}
             </div>
           </Card>
         </div>
