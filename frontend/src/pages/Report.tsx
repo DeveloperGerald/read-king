@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Copy, Download, RefreshCw, Sun, Moon } from 'lucide-react'
+import { Copy, Download, RefreshCw, Sun, Moon, Wand2 } from 'lucide-react'
 import { Card, CardDesc, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { Tabs } from '@/components/ui/Tabs'
+import { Textarea } from '@/components/ui/Textarea'
 import { MarkdownView } from '@/components/MarkdownView'
 import { getOutlineMarkdown, getReportMarkdown, getReportStatus, getBookMeta, startReport } from '@/utils/api'
 import { downloadTextFile } from '@/utils/download'
-import { loadDraft } from '@/utils/storage'
+import { loadDraft, saveDraft } from '@/utils/storage'
 import { useInterval } from '@/hooks/useInterval'
 import { useTheme } from '@/hooks/useTheme'
 
@@ -29,6 +30,9 @@ export default function Report() {
   const location = useLocation()
   const state = (location.state || {}) as RouteState
   const _draft = useMemo(() => state.draft ?? loadDraft(), [state.draft])
+  const [requirements, setRequirements] = useState(_draft.user_requirements || '')
+  const [feelings, setFeelings] = useState(_draft.user_feelings || '')
+  const [showConfig, setShowConfig] = useState(false)
 
   const [status, setStatus] = useState<{
     status: string
@@ -113,14 +117,12 @@ export default function Report() {
     setMarkdown(null)
     setStatus({ status: 'generating' })
     try {
-      await startReport(
-        bookId,
-        {
-          user_requirements: _draft.user_requirements || '',
-          user_feelings: _draft.user_feelings || '',
-        },
-        true
-      )
+      const payload = {
+        user_requirements: requirements,
+        user_feelings: feelings,
+      }
+      saveDraft(payload)
+      await startReport(bookId, payload, true)
       await refresh()
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
@@ -128,7 +130,28 @@ export default function Report() {
     } finally {
       setRegenerating(false)
     }
-  }, [bookId, _draft.user_feelings, _draft.user_requirements, refresh])
+  }, [bookId, requirements, feelings, refresh])
+
+  const onGenerate = useCallback(async () => {
+    if (!bookId) return
+    setRegenerating(true)
+    setErr(null)
+    setStatus({ status: 'generating' })
+    try {
+      const payload = {
+        user_requirements: requirements,
+        user_feelings: feelings,
+      }
+      saveDraft(payload)
+      await startReport(bookId, payload, false)
+      await refresh()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e))
+      setStatus({ status: 'failed', error: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setRegenerating(false)
+    }
+  }, [bookId, requirements, feelings, refresh])
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
@@ -187,17 +210,68 @@ export default function Report() {
             </Button>
             <Button variant="ghost" onClick={() => nav('/')}>返回工作台</Button>
             {bookId ? (
-              <Button variant="secondary" onClick={() => nav(`/books/${bookId}`, { state: { draft: _draft } })}>
+              <Button variant="secondary" onClick={() => nav(`/books/${bookId}`, { state: { draft: { user_requirements: requirements, user_feelings: feelings } } })}>
                 返回书籍
               </Button>
             ) : null}
-            <Button variant="secondary" onClick={onRegenerate} disabled={!bookId || regenerating || processing}>
-              <span className="inline-flex items-center gap-2">
-                {regenerating ? <Spinner /> : <RefreshCw className="h-4 w-4" />} 重新生成
-              </span>
+            <Button
+              variant={showConfig ? 'primary' : 'secondary'}
+              onClick={() => setShowConfig(!showConfig)}
+              disabled={processing}
+            >
+              配置需求
             </Button>
+            {status?.status === 'none' ? (
+              <Button onClick={onGenerate} disabled={!bookId || regenerating || processing}>
+                <span className="inline-flex items-center gap-2">
+                  {regenerating ? <Spinner /> : <Wand2 className="h-4 w-4" />} 开始生成
+                </span>
+              </Button>
+            ) : (
+              <Button variant="secondary" onClick={onRegenerate} disabled={!bookId || regenerating || processing}>
+                <span className="inline-flex items-center gap-2">
+                  {regenerating ? <Spinner /> : <RefreshCw className="h-4 w-4" />} 重新生成
+                </span>
+              </Button>
+            )}
           </div>
         </div>
+
+        {showConfig || status?.status === 'none' ? (
+          <div className="mt-6">
+            <Card>
+              <CardTitle>生成配置</CardTitle>
+              <CardDesc>在此填写你的具体需求和对本书的个人理解，AI 将据此调整报告内容。</CardDesc>
+              <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div>
+                  <div className="mb-2 text-sm font-medium text-foreground">生成需求</div>
+                  <Textarea
+                    value={requirements}
+                    onChange={(e) => setRequirements(e.target.value)}
+                    placeholder="例如：按章节梳理核心观点，给出行动清单，侧重于技术实现细节..."
+                    className="min-h-[150px]"
+                  />
+                </div>
+                <div>
+                  <div className="mb-2 text-sm font-medium text-foreground">读后感 / 个人理解</div>
+                  <Textarea
+                    value={feelings}
+                    onChange={(e) => setFeelings(e.target.value)}
+                    placeholder="例如：我在阅读时感到作者对某个观点的解释不够透彻，希望报告能进一步补充..."
+                    className="min-h-[150px]"
+                  />
+                </div>
+              </div>
+              {status?.status === 'none' && (
+                <div className="mt-6 flex justify-end">
+                  <Button onClick={onGenerate} disabled={regenerating || processing} className="w-full md:w-auto">
+                    {regenerating ? <Spinner /> : <Wand2 className="h-4 w-4 mr-2" />} 立即生成报告
+                  </Button>
+                </div>
+              )}
+            </Card>
+          </div>
+        ) : null}
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-1">

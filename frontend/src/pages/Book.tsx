@@ -40,8 +40,6 @@ export default function Book() {
   const [bookMeta, setBookMeta] = useState<{ title?: string | null; author?: string | null; original_filename?: string | null } | null>(null)
   const [loadingIndex, setLoadingIndex] = useState(false)
   const [previewErr, setPreviewErr] = useState<string | null>(null)
-  const [busyPreview, setBusyPreview] = useState(false)
-  const [reporting, setReporting] = useState(false)
 
   const canFetchPreview = indexStatus?.status === 'completed'
 
@@ -90,54 +88,10 @@ export default function Book() {
     }
   }, [bookId])
 
-  const onGenerateReport = useCallback(async () => {
+  const onGenerateReport = useCallback(() => {
     if (!bookId) return
-    setReporting(true)
-    try {
-      await startReport(bookId, {
-        user_requirements: draft.user_requirements || '',
-        user_feelings: draft.user_feelings || '',
-      })
-      addReport({
-        book_id: bookId,
-        filename: bookMeta?.original_filename || '',
-        title: bookMeta?.title || undefined,
-        created_at: Date.now(),
-      })
-      nav(`/reports/${bookId}`, { state: { draft } })
-    } catch (e) {
-      setPreviewErr(e instanceof Error ? e.message : String(e))
-    } finally {
-      setReporting(false)
-    }
-  }, [bookId, draft, nav, bookMeta])
-
-  const onRegenerateReport = useCallback(async () => {
-    if (!bookId) return
-    if (!window.confirm('确定要重新生成报告吗？这会覆盖已有报告。')) return
-    setReporting(true)
-    try {
-      await startReport(
-        bookId,
-        {
-          user_requirements: draft.user_requirements || '',
-          user_feelings: draft.user_feelings || '',
-        },
-        true
-      )
-      addReport({
-        book_id: bookId,
-        filename: bookMeta?.original_filename || '',
-        title: bookMeta?.title || undefined,
-        created_at: Date.now(),
-      })
-      nav(`/reports/${bookId}`, { state: { draft } })
-    } catch (e) {
-      setPreviewErr(e instanceof Error ? e.message : String(e))
-    } finally {
-      setReporting(false)
-    }
-  }, [bookId, draft, nav, bookMeta])
+    nav(`/reports/${bookId}`, { state: { draft } })
+  }, [bookId, draft, nav])
 
   useEffect(() => {
     ensureIndexStarted()
@@ -236,43 +190,18 @@ export default function Book() {
 
           <Card className="lg:col-span-1">
             <CardTitle>报告操作</CardTitle>
-            <CardDesc>点击下方按钮开始生成 AI 读书报告。</CardDesc>
+            <CardDesc>点击下方按钮进入 AI 读书报告页面。</CardDesc>
             <div className="mt-6 flex flex-col gap-3">
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  className="flex-1"
-                  disabled={!canFetchPreview || reporting}
-                  onClick={onGenerateReport}
-                >
-                  {reporting ? (
-                    <span className="inline-flex items-center gap-2">
-                      <Spinner /> 生成中
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-2">
-                      <Wand2 className="h-4 w-4" /> 生成报告
-                    </span>
-                  )}
-                </Button>
-                <Button variant="secondary" className="flex-1" disabled={!canFetchPreview || reporting} onClick={onRegenerateReport}>
-                  {reporting ? (
-                    <span className="inline-flex items-center gap-2">
-                      <Spinner /> 生成中
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-2">
-                      <Wand2 className="h-4 w-4" /> 重新生成
-                    </span>
-                  )}
-                </Button>
-              </div>
-              
-              <Button variant="ghost" className="w-full" disabled={!bookId} onClick={() => nav(`/reports/${bookId}`, { state: { draft } })}>
+              <Button
+                className="w-full"
+                disabled={!canFetchPreview}
+                onClick={onGenerateReport}
+              >
                 <span className="inline-flex items-center gap-2">
-                  <FileText className="h-4 w-4" /> 查看已有报告
+                  <Wand2 className="h-4 w-4" /> 进入报告生成页
                 </span>
               </Button>
-
+              
               {previewErr ? <div className="mt-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">{previewErr}</div> : null}
               {!canFetchPreview ? (
                 <div className="mt-2 text-xs text-muted-foreground">提示：索引完成后才能生成报告。</div>
