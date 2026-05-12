@@ -1,6 +1,7 @@
 export type SavedDraft = {
   user_requirements: string
   user_feelings: string
+  report_style?: string
 }
 
 export type SavedBook = {
@@ -30,6 +31,7 @@ export function loadDraft(): SavedDraft {
     return {
       user_requirements: typeof data.user_requirements === 'string' ? data.user_requirements : '',
       user_feelings: typeof data.user_feelings === 'string' ? data.user_feelings : '',
+      report_style: typeof data.report_style === 'string' ? data.report_style : '读书博主风',
     }
   } catch {
     return { user_requirements: '', user_feelings: '' }

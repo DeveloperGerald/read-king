@@ -240,6 +240,7 @@ def generate_report(
     book_id: str,
     user_requirements: str | None = None,
     user_feelings: str | None = None,
+    report_style: str = "读书博主风",
     force: bool = False,
 ) -> ReportStatus:
     ensure_storage_dirs(settings)
@@ -274,6 +275,7 @@ def generate_report(
             book_id=book_id,
             user_requirements=user_requirements,
             user_feelings=user_feelings,
+            style=report_style,
             mode="report",
             on_progress=on_workflow_progress,
         )

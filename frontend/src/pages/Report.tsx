@@ -14,7 +14,7 @@ import { loadDraft, saveDraft } from '@/utils/storage'
 import { useInterval } from '@/hooks/useInterval'
 import { useTheme } from '@/hooks/useTheme'
 
-type RouteState = { draft?: { user_requirements: string; user_feelings: string } }
+type RouteState = { draft?: { user_requirements: string; user_feelings: string; report_style?: string } }
 
 function statusColor(status: string) {
   if (status === 'completed') return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
@@ -32,7 +32,10 @@ export default function Report() {
   const _draft = useMemo(() => state.draft ?? loadDraft(), [state.draft])
   const [requirements, setRequirements] = useState(_draft.user_requirements || '')
   const [feelings, setFeelings] = useState(_draft.user_feelings || '')
+  const [reportStyle, setReportStyle] = useState(_draft.report_style || '读书博主风')
   const [showConfig, setShowConfig] = useState(false)
+
+  const styles = ['读书博主风', '严肃书评风', '极简主义风']
 
   const [status, setStatus] = useState<{
     status: string
@@ -120,6 +123,7 @@ export default function Report() {
       const payload = {
         user_requirements: requirements,
         user_feelings: feelings,
+        report_style: reportStyle,
       }
       saveDraft(payload)
       await startReport(bookId, payload, true)
@@ -130,7 +134,7 @@ export default function Report() {
     } finally {
       setRegenerating(false)
     }
-  }, [bookId, requirements, feelings, refresh])
+  }, [bookId, requirements, feelings, reportStyle, refresh])
 
   const onGenerate = useCallback(async () => {
     if (!bookId) return
@@ -141,6 +145,7 @@ export default function Report() {
       const payload = {
         user_requirements: requirements,
         user_feelings: feelings,
+        report_style: reportStyle,
       }
       saveDraft(payload)
       await startReport(bookId, payload, false)
@@ -151,7 +156,7 @@ export default function Report() {
     } finally {
       setRegenerating(false)
     }
-  }, [bookId, requirements, feelings, refresh])
+  }, [bookId, requirements, feelings, reportStyle, refresh])
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
@@ -210,7 +215,7 @@ export default function Report() {
             </Button>
             <Button variant="ghost" onClick={() => nav('/')}>返回工作台</Button>
             {bookId ? (
-              <Button variant="secondary" onClick={() => nav(`/books/${bookId}`, { state: { draft: { user_requirements: requirements, user_feelings: feelings } } })}>
+              <Button variant="secondary" onClick={() => nav(`/books/${bookId}`, { state: { draft: { user_requirements: requirements, user_feelings: feelings, report_style: reportStyle } } })}>
                 返回书籍
               </Button>
             ) : null}
@@ -243,6 +248,24 @@ export default function Report() {
               <CardTitle>生成配置</CardTitle>
               <CardDesc>在此填写你的具体需求和对本书的个人理解，AI 将据此调整报告内容。</CardDesc>
               <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="md:col-span-2">
+                  <div className="mb-2 text-sm font-medium text-foreground">报告风格</div>
+                  <div className="flex flex-wrap gap-3">
+                    {styles.map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setReportStyle(s)}
+                        className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
+                          reportStyle === s
+                            ? 'bg-primary text-primary-foreground shadow-md'
+                            : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div>
                   <div className="mb-2 text-sm font-medium text-foreground">生成需求</div>
                   <Textarea

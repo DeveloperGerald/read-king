@@ -18,6 +18,7 @@ export type IndexStatusResponse = {
 export type GenerateReportRequest = {
   user_requirements: string
   user_feelings: string
+  report_style?: string
 }
 
 export type ReportStatusResponse = {

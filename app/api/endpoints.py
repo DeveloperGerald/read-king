@@ -281,6 +281,7 @@ def start_report_generation(
         book_id=book_id,
         user_requirements=body.user_requirements,
         user_feelings=body.user_feelings,
+        report_style=body.report_style or "读书博主风",
         force=force,
     )
     # 3. 返回当前状态（由于是异步，此处可能还是 none 或刚变为 generating）

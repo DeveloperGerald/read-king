@@ -49,6 +49,7 @@ class IndexStatusResponse(BaseModel):
 class GenerateReportRequest(BaseModel):
     user_requirements: str | None = None
     user_feelings: str | None = None
+    report_style: str | None = "读书博主风"
 
 
 class ReportStatusResponse(BaseModel):
