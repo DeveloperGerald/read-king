@@ -60,5 +60,9 @@ class AgentReportState(ReportInputState, ReportOutputState):
     # 研究反思反馈与重试计数
     research_feedback: Optional[str]
     research_retry_count: int
-    research_completion_count: Annotated[int, operator.add]  # 使用累加器处理并行更新
+    
+    # 研究同步标记
+    book_expert_done: bool
+    context_researcher_done: bool
+    
     next_research_action: str

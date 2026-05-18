@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     chroma_server_port: int = 8002
     chroma_collection_prefix: str = "readking"
 
+    langchain_tracing_v2: bool = False
+    langchain_api_key: str | None = Field(default=None, repr=False)
+    langchain_project: str = "read-king"
+
     log_level: str = "info"
 
     # 校验配置在不同 Provider 下的必填项，避免运行到一半才报错

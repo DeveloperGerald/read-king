@@ -78,7 +78,7 @@ def build_agentic_report_graph(settings: Settings):
             on_progress("书籍专家正在深入研读内容...", 1)
         result = book_expert_agent.invoke(state, config)
         updates = result if isinstance(result, dict) else {"messages": [result]}
-        updates["research_completion_count"] = 1 # 每次返回 1，利用 Annotated[int, operator.add] 自动累加
+        updates["book_expert_done"] = True 
         return updates
 
     def node_context_researcher(state: AgentReportState, config: RunnableConfig) -> dict[str, Any]:
@@ -87,7 +87,7 @@ def build_agentic_report_graph(settings: Settings):
             on_progress("背景研究员正在搜集外部信息...", 1)
         result = context_researcher_agent.invoke(state, config)
         updates = result if isinstance(result, dict) else {"messages": [result]}
-        updates["research_completion_count"] = 1 # 同上
+        updates["context_researcher_done"] = True
         return updates
 
     # 2. 研究反思节点（并行同步栅栏）
@@ -95,10 +95,20 @@ def build_agentic_report_graph(settings: Settings):
         on_progress = config.get("configurable", {}).get("on_progress")
         if on_progress:
             on_progress("研究主管正在评估素材充分性...", 2)
-        # 同步栅栏：判断当前累加值是否达到了应有的倍数（每轮 2 个专家）
-        target_count = (state.get("research_retry_count", 0) + 1) * 2
-        if state.get("research_completion_count", 0) < target_count:
-            return {} 
+            
+        # 分别检查两个研究员的完成情况
+        next_action = state.get("next_research_action", "none")
+        
+        if next_action in ["both", "none"]:
+            # 第一轮或明确要求两者时，需等待双方都完成
+            if not (state.get("book_expert_done") and state.get("context_researcher_done")):
+                return {"status": "waiting"} 
+        elif next_action == "book_expert":
+            if not state.get("book_expert_done"):
+                return {"status": "waiting"}
+        elif next_action == "context_researcher":
+            if not state.get("context_researcher_done"):
+                return {"status": "waiting"}
 
         # 汇总研究成果
         research_context = ""
@@ -128,8 +138,10 @@ def build_agentic_report_graph(settings: Settings):
                 "research_notes": research_context,
                 "next_research_action": reflection.next_action if not reflection.sufficient else "none",
                 "status": "research_sufficient" if reflection.sufficient else "research_insufficient",
-                "research_retry_count": state.get("research_retry_count", 0) + (0 if reflection.sufficient else 1)
-                # 不再需要手动重置 research_completion_count，因为它会持续累加
+                "research_retry_count": state.get("research_retry_count", 0) + (0 if reflection.sufficient else 1),
+                # 重置完成标记，为下一轮潜在的重试做准备
+                "book_expert_done": False,
+                "context_researcher_done": False
             }
         except Exception as e:
             logger.error(f"Research reflector failed: {e}")
@@ -341,9 +353,13 @@ def build_agentic_report_graph(settings: Settings):
     workflow.add_edge("context_researcher", "research_reflector")
     
     def route_after_research_reflector(state: AgentReportState) -> str:
-         if state.get("status") == "failed":
+         status = state.get("status")
+         if status == "failed":
              return END
-         if state.get("status") == "research_sufficient":
+         if status == "waiting":
+             # 同步栅栏：如果还有研究员没跑完，结束当前分支的执行，等待另一个分支触发
+             return END
+         if status == "research_sufficient":
              return "planner"
          if state.get("research_retry_count", 0) >= 2:
              logger.warning("Reached max research retry count, proceeding to planner.")
@@ -362,7 +378,7 @@ def build_agentic_report_graph(settings: Settings):
         if state.get("status") == "failed":
             return END
         if state.get("workflow_mode") == "outline":
-            return "__end__"
+            return END
         return "writer"
 
     def route_after_reviewer(state: AgentReportState) -> str:
@@ -421,7 +437,8 @@ def run_agent_report_workflow(
         "revision_count": 0,
         "review_feedback": None,
         "research_retry_count": 0,
-        "research_completion_count": 0,
+        "book_expert_done": False,
+        "context_researcher_done": False,
         "research_feedback": None,
         "next_research_action": "none",
         "research_notes": ""
